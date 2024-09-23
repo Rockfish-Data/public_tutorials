@@ -91,17 +91,17 @@ def train_model(data):
     return get_xgb_clf(X_train, y_train, X_valid, y_valid)
 
 
-def compute_metrics(data):
+def compute_metrics(data, Xt,yt):
     synthetic_precision, synthetic_recall = [], []
-    X,y = create_X_y_for_xgb([data])
+    X, y = create_X_y_for_xgb([data])
     for i in range(250):
         X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2)
         clf_with_synthetic = get_xgb_clf(X_train, y_train, X_valid, y_valid)
 
-        y_pred_with_synthetic = clf_with_synthetic.predict(X)
+        y_pred_with_synthetic = clf_with_synthetic.predict(Xt)
 
-        synthetic_recall.append(recall_score(y, y_pred_with_synthetic))
-        synthetic_precision.append(precision_score(y, y_pred_with_synthetic))
+        synthetic_recall.append(recall_score(yt, y_pred_with_synthetic))
+        synthetic_precision.append(precision_score(yt, y_pred_with_synthetic))
         synthetic_precision = np.array(synthetic_precision)
         synthetic_recall = np.array(synthetic_recall)
         return synthetic_precision, synthetic_recall
@@ -121,18 +121,18 @@ async def main():
     clf_default = pickle.load(open('./base_model.mdl', 'rb'))
 
     test_data = pd.read_csv('./testing.csv')
-    X, y = create_X_y_for_xgb([test_data])
+    Xt, yt = create_X_y_for_xgb([test_data])
 
     print('Evaluating model performance...')
-    synthetic_precision, synthetic_recall = compute_metrics(data)
-    y_pred_default = clf_default.predict(X)
-    default_metrics = metrics(y, y_pred_default)
+    synthetic_precision, synthetic_recall = compute_metrics(data, Xt, yt)
+    y_pred_default = clf_default.predict(Xt)
+    default_metrics = metrics(yt, y_pred_default)
 
     df = pd.DataFrame({
         'Mean Precision': [default_metrics.precision.mean(), synthetic_precision.mean()],
-        'Standard Deviation Precision': [0, synthetic_precision.std()],
+        # 'Standard Deviation Precision': [0, synthetic_precision.std()],
         'Mean Recall': [default_metrics.recall.mean(), synthetic_recall.mean()],
-        'Standard Deviation Recall': [0, synthetic_recall.std()]
+        # 'Standard Deviation Recall': [0, synthetic_recall.std()]
     },
         index=['Default Model', 'Blended Synthetic Data Model'])
     print(df)
@@ -147,8 +147,8 @@ async def main():
         Recall: {default_metrics.recall.mean()}
 
     Model with Blended Synthetic Data:
-        Mean Precision: {synthetic_precision.mean()} with a standard deviation of: {synthetic_precision.std()}
-        Mean Recall: {synthetic_recall.mean()} with a standard deviation of: {synthetic_recall.std()}
+        Mean Precision: {synthetic_precision.mean()}
+        Mean Recall: {synthetic_recall.mean()}
     ''')
 
 
