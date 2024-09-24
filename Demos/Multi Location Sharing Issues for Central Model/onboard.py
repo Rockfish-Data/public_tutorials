@@ -22,7 +22,7 @@ def get_rf_recommended_workflow(dataset, session_key, metadata_fields, privacy_r
         remap_actions.append(remap)
 
     # action updates per use case
-    recommender_output.actions = remap_actions[0] + recommender_output.actions
+    recommender_output.actions = [remap_actions[0]] + recommender_output.actions
     return recommender_output
 
 
