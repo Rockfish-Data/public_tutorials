@@ -1,3 +1,5 @@
+import pickle
+
 import rockfish as rf
 import rockfish.actions as ra
 
@@ -40,29 +42,26 @@ params = {
 }
 
 
-async def train():
-    conn = rf.Connection.from_env()
+async def train(recommended_file):
+    conn = rf.Connection.from_config()
+    recommender_output = pickle.load(open(recommended_file, 'rb'))
+    model_action = recommender_output.actions[1]
+    train_actions = recommender_output.actions[:2]
 
-    # from recommended actions from onboard
-    encoder_config = params['encoder']
-
-    model_config = params['model']
-
-    config = ra.TrainTimeGAN.Config(
-        encoder=encoder_config,
-        doppelganger=model_config,
-    )
-    train_action = ra.TrainTimeGAN(config)
+    # encoder_config = params['encoder']
+    #
+    # model_config = params['model']
+    #
+    # config = ra.TrainTimeGAN.Config(
+    #     encoder=encoder_config,
+    #     doppelganger=model_config,
+    # )
+    # train_action = ra.TrainTimeGAN(config)
 
     builder = rf.WorkflowBuilder()
-    (builder.add_action
-     (ra.DatastreamLoad(), alias='stream-load'))
-    builder.add_action(train_action, parents=['stream-load'])
+    builder.add_action(ra.DatastreamLoad(), alias='stream-load')
+    builder.add_action(*train_actions, parents=['stream-load'])
     workflow = await builder.start(conn)
     print(workflow.id())
 
-    async for model in workflow.models():
-        print(model)
-
-
-asyncio.run(train())
+asyncio.run(train('...'))
