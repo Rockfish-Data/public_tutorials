@@ -15,6 +15,10 @@ async def runtime():
     print(f'Runtime ID [for debugging now, not shown in demo]: {runtime_workflow.id()}')
 
     # stream datasets to model
+    # each running workflow is for one datasource, and each chunk
+    # comes from this datasource over time
+    # so depending on the demo, you might have to set up more than
+    # one running workflow (e.g. for each location)
     dataset_paths = ["test.csv"]  # ONLY CHANGE THIS PER DEMO USE CASE, example: ["jan_data.csv", "feb_data.csv"]
     for i, path in enumerate(dataset_paths):
         dataset = rf.Dataset.from_csv("train", path)
