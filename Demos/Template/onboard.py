@@ -6,7 +6,10 @@ from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
 
 
-def get_rf_recommended_workflow(filepath, session_key, metadata_fields, privacy_requirements, fidelity_requirements):
+def get_rf_recommended_workflow(
+        filepath, session_key, metadata_fields,
+        privacy_requirements, fidelity_requirements
+):
     dataset = rf.Dataset.from_csv("sample_data", filepath)
     dataset_properties = DatasetPropertyExtractor(
         dataset=dataset,
@@ -40,6 +43,8 @@ def get_rf_recommended_workflow(filepath, session_key, metadata_fields, privacy_
 
 sample_data_filepath = "test.csv"
 
+# ONLY CHANGE THIS PER DEMO USE CASE
+# e.g. for AI model training, no need for privacy_requirements
 runtime_conf = get_rf_recommended_workflow(
     filepath=sample_data_filepath,
     session_key="customer",
