@@ -12,10 +12,11 @@ async def get_synthetic_data(model_to_gen_conf):
     for model_label, gen_params in model_to_gen_conf.items():
         print(f"generating from model {model_label} with params = {gen_params}")
         generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
+
+        # USUALLY IN THE DEMO WE WOULD SHOW GENERATION LIVE, SO PUT A WORKFLOW_ID HERE WITH ALREADY TRAINED MODELS
         model = await conn.list_models(labels={"kind": model_label, "workflow_id": "3HnOxCXK5OO7MpHEzYRee5"}).last()
 
         builder = rf.WorkflowBuilder()
-        # TODO: modify generate_conf / workflow according to "condition"
         builder.add_path(model, generate_conf, ra.DatasetSave(name="synthetic"))
         workflow = await builder.start(conn)
         syn_datasets.append((await workflow.datasets().concat(conn)).table)
@@ -29,16 +30,13 @@ async def generate():
     model_label_to_gen_conf = {
         "test.csv": {
             "sessions": 1500,
-            "condition": "amplify_fraud"
         },
         # EXAMPLE:
         # "jan": {
         #     "sessions": 500,
-        #     "condition": None
         # }
         # "feb": {
         #     "sessions": 500,
-        #     "condition": None
         # }
     }
     syn_data = await get_synthetic_data(model_label_to_gen_conf)
