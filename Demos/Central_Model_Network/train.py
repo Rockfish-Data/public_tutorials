@@ -1,67 +1,37 @@
+import rockfish as rf
+import asyncio
 import pickle
 
-import rockfish as rf
-import rockfish.actions as ra
-
-import asyncio
-
-params = {
-    'encoder': ra.TrainTimeGAN.DatasetConfig(
-        timestamp=ra.TrainTimeGAN.TimestampConfig(field="timestamp"),
-        metadata=[
-            ra.TrainTimeGAN.FieldConfig(field="customer", type="session"),
-            ra.TrainTimeGAN.FieldConfig(field="age", type="categorical"),
-            ra.TrainTimeGAN.FieldConfig(field="gender", type="categorical"),
-        ],
-        measurements=[
-            ra.TrainTimeGAN.FieldConfig(field="merchant", type="categorical"),
-            ra.TrainTimeGAN.FieldConfig(field="category", type="categorical"),
-            ra.TrainTimeGAN.FieldConfig(field="amount", type="continuous"),
-            ra.TrainTimeGAN.FieldConfig(field="fraud", type="categorical"),
-        ],
-    ),
-    'model': ra.TrainTimeGAN.DGConfig(
-        sample_len=4,
-        epoch=250,
-        epoch_checkpoint_freq=100,
-        sessions=4000,
-        batch_size=512,
-        activate_normalization_per_sample=False,
-        g_lr=0.001,
-        d_lr=0.001,
-        attr_d_lr=0.001,
-        generator_attribute_num_units=100,
-        generator_attribute_num_layers=3,
-        generator_feature_num_units=100,
-        generator_feature_num_layers=5,
-        discriminator_num_layers=5,
-        discriminator_num_units=200,
-        attr_discriminator_num_layers=5,
-        attr_discriminator_num_units=200
-    )
-}
-
-
-async def train(recommended_file):
+async def runtime():
+    # connect to Rockfish platform
     conn = rf.Connection.from_config()
-    recommender_output = pickle.load(open(recommended_file, 'rb'))
-    model_action = recommender_output.actions[1]
-    train_actions = recommender_output.actions[:2]
 
-    # encoder_config = params['encoder']
-    #
-    # model_config = params['model']
-    #
-    # config = ra.TrainTimeGAN.Config(
-    #     encoder=encoder_config,
-    #     doppelganger=model_config,
-    # )
-    # train_action = ra.TrainTimeGAN(config)
+    # load runtime_conf (obtained after onboarding)
+    runtime_conf = pickle.load(open("runtime_conf.pkl", "rb"))
+    datastream = runtime_conf.actions["datastream-load"]
 
-    builder = rf.WorkflowBuilder()
-    builder.add_action(ra.DatastreamLoad(), alias='stream-load')
-    builder.add_action(*train_actions, parents=['stream-load'])
-    workflow = await builder.start(conn)
-    print(workflow.id())
+    # start runtime
+    runtime_workflow = await runtime_conf.start(conn)
+    print(f'❗️Runtime ID [for debugging now, not shown in demo]: {runtime_workflow.id()}')
 
-asyncio.run(train('...'))
+    # stream datasets to model
+    # each running workflow is for one datasource, and each chunk
+    # comes from this datasource over time
+    # so depending on the demo, you might have to set up more than
+    # one running workflow (e.g. for each location)
+    dataset_paths = ["location3.csv"]  # ONLY CHANGE THIS PER DEMO USE CASE, example: ["jan_data.csv", "feb_data.csv"]
+    for i, path in enumerate(dataset_paths):
+        dataset = rf.Dataset.from_csv("train", path)
+        await runtime_workflow.write_datastream(datastream, dataset)
+        print(f"Training model {i} on {path}")
+
+    async for log in runtime_workflow.logs():
+        print(log)
+
+    # optional: add labels
+    for i, path in enumerate(dataset_paths):
+        model = await runtime_workflow.models().nth(i)
+        await model.add_labels(conn, kind=path)
+        print(f"Finished training model {i} on {path}")
+
+asyncio.run(runtime())
