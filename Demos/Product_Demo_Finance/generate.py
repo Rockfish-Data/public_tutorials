@@ -32,6 +32,8 @@ async def get_synthetic_data(model_to_gen_conf):
         syn_datasets.append((await workflow.datasets().concat(conn)).table)
         print(f"Finished generating {gen_params['sessions']} sessions from model {model_label}")
 
+    await conn.close()
+
     return pa.concat_tables(syn_datasets)
 
 async def generate():
