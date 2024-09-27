@@ -50,5 +50,5 @@ runtime_conf = get_rf_recommended_workflow(
     metadata_fields=[],
     privacy_requirements={},
     fidelity_requirements={},
-    model_customizations={'epoch': 400, 'batch_size': 116, 'sessions': 60}
+    model_customizations={'epoch': 400, 'batch_size': 116, 'sessions': 696}
 )
