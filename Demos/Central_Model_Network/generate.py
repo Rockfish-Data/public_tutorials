@@ -29,7 +29,7 @@ async def get_synthetic_data(model_to_gen_conf):
     return pa.concat_tables(syn_datasets)
 
 
-def evaluate_model_performance(data, feature="feature_13"):
+def evaluate_model_performance(data, feature="feature_15"):
     data = pd.concat(data)
 
     data = data[[feature, 'timestamp']].rename(columns={'timestamp':'ds', feature:'y'})
@@ -38,8 +38,19 @@ def evaluate_model_performance(data, feature="feature_13"):
 
     model = prophet.Prophet()
     model.fit(data)
-    future = model.make_future_dataframe(periods=60, freq='min')
+
+    # make future df that matches test.csv timestamps
+    test = pd.read_csv('test.csv')
+    reference_time = pd.Timestamp('2023-06-01 00:00:00')
+    future = pd.DataFrame()
+    future['ds'] = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x,'min')+reference_time)
+    print(future)
+
+    # make predictions
     forecast = model.predict(future)
+    print(forecast)
+
+    # TODO: plot with labels
     fig = model.plot(forecast)
     fig.show()
 
@@ -73,9 +84,14 @@ async def generate():
     loc3_real_data = pd.read_csv("location3.csv")
     locx_data = pd.read_csv("locationx.csv")
 
+    #         dates = pd.date_range(
+    #             start=last_date,
+    #             periods=periods + 1,  # An extra in case we include start
+    #             freq=freq)
+
     evaluate_model_performance([locx_data])  # baseline: missing location3 data
-    evaluate_model_performance([locx_data, loc3_data])  # rf: use synthetic location3
-    evaluate_model_performance([locx_data, loc3_real_data])  # ideal: use real location3
+    # evaluate_model_performance([locx_data, loc3_data])  # rf: use synthetic location3
+    # evaluate_model_performance([locx_data, loc3_real_data])  # ideal: use real location3
 
 
 
