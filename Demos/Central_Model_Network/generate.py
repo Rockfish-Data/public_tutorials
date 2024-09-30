@@ -52,17 +52,22 @@ def evaluate_model_performance(data, feature="feature_15", title=None):
 
     # make predictions using learnt model
     forecast = model.predict(future)
+    forecast.to_csv(f"forecast_{title}.csv")
+
+    # get anomaly labels
+    pred_labels = np.where(forecast['yhat'].between(forecast['yhat_lower'], forecast['yhat_upper']), 0, 1)
 
     # plot
     fig, ax = plt.subplots()
     x = pd.to_datetime(forecast['ds'])  # plot timestamps on x axis
-    ax.plot(x, forecast['yhat'], label="Predicted Value")
-    ax.plot(x, test[feature], label="True Value")
+    ax.plot(x, test[feature], 'g', label="True Value")
     ax.fill_between(x, forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.1)
 
-    # TODO: mark true and false positives instead of this
-    true_anom_idxs = np.where(test_labels['label'] == 1)[0]  # get idxs for ground truth anomalies
-    ax.plot(x.iloc[true_anom_idxs], test[feature].iloc[true_anom_idxs], "r.", label="Anomaly (GT)")
+    # mark true and false positives
+    tp_idxs = np.where((test_labels['label'] == 1) & (pred_labels == 1))[0]  # get idxs for true positives
+    fp_idxs = np.where((test_labels['label'] == 0) & (pred_labels == 1))[0]  # get idxs for false positives
+    ax.plot(x.iloc[tp_idxs], test[feature].iloc[tp_idxs], "r.", label="True Anomaly")
+    ax.plot(x.iloc[fp_idxs], test[feature].iloc[fp_idxs], "k.", label="False Anomaly")
 
     ax.legend()
     plt.title(title)
