@@ -37,16 +37,23 @@ async def get_synthetic_data(model_to_gen_conf):
     return pa.concat_tables(syn_datasets)
 
 async def generate():
+    # TODO: introduce this story in the beginning
     model_label_to_gen_conf = {
-        "transactions_week1.csv": {
+        "week1": {
+            # start:
+            # end:
+            # model:
             "sessions": 250,
+            # TODO: accept/retain time range
         },
-        "transactions_week2.csv": {
+        "week2": {
             "sessions": 500,
+            # TODO: accept/retain time range
         },
     }
     syn_data = await get_synthetic_data(model_label_to_gen_conf)
 
+    # TODO: show connector
     pa.csv.write_csv(syn_data, "synthetic.csv")
 
 asyncio.run(generate())

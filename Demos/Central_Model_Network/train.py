@@ -45,6 +45,7 @@ async def runtime():
         print(log)
 
     # optional: add labels
+    # TODO: share location3 model with central
     for i, path in enumerate(dataset_paths):
         model = await runtime_workflow.models().nth(i)
         await model.add_labels(conn, kind=path)

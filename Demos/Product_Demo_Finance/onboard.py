@@ -39,6 +39,7 @@ def get_rf_recommended_workflow(
 
     return runtime_conf
 
+# TODO: download from databricks using HTTP
 sample_data_filepath = "transactions_week1.csv"
 
 runtime_conf = get_rf_recommended_workflow(

@@ -76,6 +76,7 @@ def evaluate_model_performance(data, feature="feature_15", title=None):
 
 
 async def generate():
+    # TODO: make this match template
     model_label_to_gen_conf = {
         "location3.csv": {
             "sessions": 1500,
@@ -92,13 +93,16 @@ async def generate():
 
     loc1_data = pd.read_csv("location1.csv")
     loc2_data = pd.read_csv("location2.csv")
-    loc3_data = pd.read_csv("syn_data.csv")
+    loc3_syn_data = pd.read_csv("syn_data.csv")
     loc3_real_data = pd.read_csv("location3.csv")
     locx_data = pd.read_csv("locationx.csv")
+    loc3_hack_data = None  # TODO: competing approach
 
-    evaluate_model_performance([loc1_data], title="Baseline")  # baseline: missing location3 data
-    evaluate_model_performance([loc1_data, loc3_data], title="Synthetic")  # rf: use synthetic location3
-    evaluate_model_performance([loc1_data, loc3_real_data], title="Ideal")  # ideal: use real location3
+    # TODO: debug baseline
+    # evaluate_model_performance([loc1_data, loc2_data], title="Baseline")  # baseline: missing location3 data
+    # evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], title="Rockfish")  # rf: use synthetic location3
+    # evaluate_model_performance([loc1_data, loc2_data, loc3_hack_data], title="Hack")  # rf: use hack location3
+    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], title="Ideal")  # ideal: use real location3
 
 
 
