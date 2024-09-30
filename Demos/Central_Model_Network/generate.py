@@ -55,12 +55,13 @@ def evaluate_model_performance(data, feature="feature_15", title=None):
     forecast.to_csv(f"forecast_{title}.csv")
 
     # get anomaly labels
-    pred_labels = np.where(forecast['yhat'].between(forecast['yhat_lower'], forecast['yhat_upper']), 0, 1)
+    pred_labels = np.where(test[feature].between(forecast['yhat_lower'], forecast['yhat_upper']), 0, 1)
 
     # plot
     fig, ax = plt.subplots()
     x = pd.to_datetime(forecast['ds'])  # plot timestamps on x axis
     ax.plot(x, test[feature], 'g', label="True Value")
+    ax.plot(x, forecast['yhat'], 'b', label="Predicted Value")
     ax.fill_between(x, forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.1)
 
     # mark true and false positives
