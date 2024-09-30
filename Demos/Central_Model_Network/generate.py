@@ -30,29 +30,38 @@ async def get_synthetic_data(model_to_gen_conf):
     return pa.concat_tables(syn_datasets)
 
 
-def evaluate_model_performance(data, feature="feature_15", title=None):
-    data = pd.concat(data)
-
-    data = data[[feature, 'timestamp']].rename(columns={'timestamp':'ds', feature:'y'})
-    data['ds'] = pd.to_datetime(data['ds'], format="%Y-%m-%d %H:%M:%S", exact=False)
-    data = data.dropna()
-
+def forecast_using_prophet(data, test, title=None):
     model = prophet.Prophet()
     model.fit(data)
 
-    # load test features and labels
-    test = pd.read_csv('test.csv', nrows=5000)
-    test_labels = pd.read_csv('test_label.csv', nrows=5000)
-
     # make future df that matches test.csv timestamps
     reference_time = pd.Timestamp('2023-06-01 00:00:00')
-    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x,'min') + reference_time)
+    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + reference_time)
     future = pd.DataFrame()
     future['ds'] = new_times
 
     # make predictions using learnt model
     forecast = model.predict(future)
-    forecast.to_csv(f"forecast_{title}.csv")
+    forecast.to_csv(f"forecast_prophet_{title}.csv")
+
+    return forecast
+
+
+def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, model="prophet", setup="Baseline", mark_tp_fp=False):
+    data = pd.concat(data)
+
+    data = data[[feature, 'timestamp']].rename(columns={'timestamp': 'ds', feature: 'y'})
+    data['ds'] = pd.to_datetime(data['ds'], format="%Y-%m-%d %H:%M:%S", exact=False)
+    data = data.dropna()
+
+    # load test features and labels
+    test = pd.read_csv('test.csv', nrows=test_nrows)
+    test_labels = pd.read_csv('test_label.csv', nrows=test_nrows)
+
+    if model == "prophet":
+        forecast = forecast_using_prophet(data, test, setup)
+    elif model == "kalman_filter":
+        forecast = None
 
     # get anomaly labels
     pred_labels = np.where(test[feature].between(forecast['yhat_lower'], forecast['yhat_upper']), 0, 1)
@@ -65,13 +74,14 @@ def evaluate_model_performance(data, feature="feature_15", title=None):
     ax.fill_between(x, forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.1)
 
     # mark true and false positives
-    tp_idxs = np.where((test_labels['label'] == 1) & (pred_labels == 1))[0]  # get idxs for true positives
-    fp_idxs = np.where((test_labels['label'] == 0) & (pred_labels == 1))[0]  # get idxs for false positives
-    ax.plot(x.iloc[tp_idxs], test[feature].iloc[tp_idxs], "r.", label="True Anomaly")
-    ax.plot(x.iloc[fp_idxs], test[feature].iloc[fp_idxs], "k.", label="False Anomaly")
+    if mark_tp_fp:
+        tp_idxs = np.where((test_labels['label'] == 1) & (pred_labels == 1))[0]  # get idxs for true positives
+        fp_idxs = np.where((test_labels['label'] == 0) & (pred_labels == 1))[0]  # get idxs for false positives
+        ax.plot(x.iloc[tp_idxs], test[feature].iloc[tp_idxs], "r.", label="True Anomaly")
+        ax.plot(x.iloc[fp_idxs], test[feature].iloc[fp_idxs], "k.", label="False Anomaly")
 
     ax.legend()
-    plt.title(title)
+    plt.title(f"{model}, {setup}")
     plt.show()
 
 
@@ -99,10 +109,10 @@ async def generate():
     loc3_hack_data = None  # TODO: competing approach
 
     # TODO: debug baseline
-    # evaluate_model_performance([loc1_data, loc2_data], title="Baseline")  # baseline: missing location3 data
+    evaluate_model_performance([loc1_data, loc2_data], setup="Baseline")  # baseline: missing location3 data
     # evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], title="Rockfish")  # rf: use synthetic location3
     # evaluate_model_performance([loc1_data, loc2_data, loc3_hack_data], title="Hack")  # rf: use hack location3
-    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], title="Ideal")  # ideal: use real location3
+    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], setup="Ideal")  # ideal: use real location3
 
 
 
