@@ -1,16 +1,18 @@
-import pandas as pd
-import rockfish as rf
-import rockfish.actions as ra
-import pyarrow as pa
-import pickle
 import asyncio
-import prophet
+import pickle
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import prophet
+import pyarrow as pa
 import pykalman as pk
+import rockfish as rf
+import rockfish.actions as ra
 from neuralprophet import NeuralProphet
 
-REF_TIME = pd.Timestamp('2023-06-01 00:00:00')
+REF_TIME = pd.Timestamp("2023-06-01 00:00:00")
+
 
 async def get_synthetic_data(model_to_gen_conf):
     # connect to Rockfish platform
@@ -33,16 +35,18 @@ async def get_synthetic_data(model_to_gen_conf):
 
 
 def forecast_using_prophet(data, test, setup=None):
-    if setup == 'Ideal':
-        model = prophet.Prophet(daily_seasonality=True,changepoint_prior_scale=.75, interval_width=.95)
+    if setup == "Ideal":
+        model = prophet.Prophet(daily_seasonality=True, changepoint_prior_scale=.75, interval_width=.95)
+    elif setup == "Baseline":
+        model = prophet.Prophet(daily_seasonality=True, changepoint_prior_scale=.25)
     else:
         model = prophet.Prophet(daily_seasonality=True)
     model.fit(data)
 
     # make future df that matches test.csv timestamps
-    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
+    new_times = test["timestamp_(min)"].apply(lambda x: pd.Timedelta(x, "min") + REF_TIME)
     future = pd.DataFrame()
-    future['ds'] = new_times
+    future["ds"] = new_times
 
     # make predictions using learnt model
     forecast = model.predict(future)
@@ -52,31 +56,37 @@ def forecast_using_prophet(data, test, setup=None):
 
 
 def forecast_using_neural_prophet(data, test, setup=None):
-    data['ds'] = pd.to_datetime(data['ds'])
+    data["ds"] = pd.date_range(start=data["ds"].iloc[0], periods=len(data), freq="min")
 
     confidence_level = 0.8
     boundaries = round((1 - confidence_level) / 2, 2)
     quantiles = [boundaries, confidence_level + boundaries]
-    model = NeuralProphet(quantiles=quantiles)
+    model = NeuralProphet(daily_seasonality=True, quantiles=quantiles)
     _ = model.fit(data)
 
     # make future df that matches test.csv timestamps
-    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
+    new_times = test["timestamp_(min)"].apply(lambda x: pd.Timedelta(x, "min") + REF_TIME)
     future = pd.DataFrame()
-    future['ds'] = new_times
-    future['y'] = [None] * len(new_times)
+    future["ds"] = new_times
+    future["y"] = [None] * len(new_times)
 
     # make predictions using learnt model
     forecast = model.predict(future)
-    forecast = forecast.rename(columns={"yhat1": "yhat", "yhat1 10.0%": "yhat_lower", "yhat1 90.0%": "yhat_upper"})
+    forecast = forecast.rename(
+        columns={
+            "yhat1": "yhat",
+            "yhat1 10.0%": "yhat_lower",
+            "yhat1 90.0%": "yhat_upper",
+        }
+    )
     forecast.to_csv(f"forecast_neural_prophet_{setup}.csv")
 
     return forecast
 
 
 def forecast_using_window(data, test, k=100, setup=None):
-    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
-    test['ds'] = new_times
+    new_times = test["timestamp_(min)"].apply(lambda x: pd.Timedelta(x, "min") + REF_TIME)
+    test["ds"] = new_times
 
     # take last k values for y
     window = data["y"].iloc[-k:]
@@ -86,7 +96,12 @@ def forecast_using_window(data, test, k=100, setup=None):
         y_mean = np.mean(window)
         ci = 3 * np.std(window)
 
-        row = {"ds": ds, "yhat": y_mean, "yhat_lower": y_mean - ci, "yhat_upper": y_mean + ci}
+        row = {
+            "ds": ds,
+            "yhat": y_mean,
+            "yhat_lower": y_mean - ci,
+            "yhat_upper": y_mean + ci,
+        }
         row_list.append(row)
 
         # update window
@@ -99,8 +114,10 @@ def forecast_using_window(data, test, k=100, setup=None):
 
 
 def forecast_using_kalman(data, test, feature, setup=None):
-    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
-    test['ds'] = new_times
+    new_times = test["timestamp_(min)"].apply(
+        lambda x: pd.Timedelta(x, "min") + REF_TIME
+    )
+    test["ds"] = new_times
 
     model = pk.KalmanFilter()
     model.em(data["y"])
@@ -114,7 +131,12 @@ def forecast_using_kalman(data, test, feature, setup=None):
         y_mean = y_mean[0]
         ci = 3 * var[0][0]
 
-        row = {"ds": ds, "yhat": y_mean, "yhat_lower": y_mean - ci, "yhat_upper": y_mean + ci}
+        row = {
+            "ds": ds,
+            "yhat": y_mean,
+            "yhat_lower": y_mean - ci,
+            "yhat_upper": y_mean + ci,
+        }
         row_list.append(row)
 
     forecast = pd.DataFrame(row_list)
@@ -123,19 +145,24 @@ def forecast_using_kalman(data, test, feature, setup=None):
     return forecast
 
 
-
-def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, model="prophet", setup="Baseline",
-                               mark_tp_fp=False):
+def evaluate_model_performance(
+    data,
+    feature="feature_15",
+    test_nrows=5000,
+    model="prophet",
+    setup="Baseline",
+    mark_tp_fp=False,
+):
     data = pd.concat(data)
 
-    data = data[[feature, 'timestamp']].rename(columns={'timestamp': 'ds', feature: 'y'})
-    data['ds'] = pd.to_datetime(data['ds'], format="%Y-%m-%d %H:%M:%S", exact=False)
+    data = data[[feature, "timestamp"]].rename(columns={"timestamp": "ds", feature: "y"})
+    data["ds"] = pd.to_datetime(data["ds"], format="%Y-%m-%d %H:%M:%S", exact=False)
     data = data.dropna()
-    data = data.drop_duplicates(subset=['ds'])
+    data = data.drop_duplicates(subset=["ds"], keep="first").sort_values(by="ds")
 
     # load test features and labels
-    test = pd.read_csv('test.csv', nrows=test_nrows)
-    test_labels = pd.read_csv('test_label.csv', nrows=test_nrows)
+    test = pd.read_csv("test.csv", nrows=test_nrows)
+    test_labels = pd.read_csv("test_label.csv", nrows=test_nrows)
 
     if model == "prophet":
         forecast = forecast_using_prophet(data, test, setup)
@@ -147,15 +174,17 @@ def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, mode
         forecast = forecast_using_kalman(data, test, feature, setup)
 
     # get anomaly labels
-    pred_labels = np.where(test[feature].between(forecast['yhat_lower'], forecast['yhat_upper']), 0, 1)
+    pred_labels = np.where(
+        test[feature].between(forecast["yhat_lower"], forecast["yhat_upper"]), 0, 1
+    )
 
     # plot
     fig, ax = plt.subplots()
-    x = pd.to_datetime(forecast['ds'])  # plot timestamps on x axis
-    ax.plot(x, test[feature], 'g', label="True Value")
-    ax.plot(x, forecast['yhat'], 'b', label="Predicted Value")
-    ax.fill_between(x, forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.1)
-    ax.set_ylim(0.0, 0.6)
+    x = pd.to_datetime(forecast["ds"])  # plot timestamps on x axis
+    ax.plot(x, test[feature], "g", label="True Value")
+    ax.plot(x, forecast["yhat"], "b", label="Predicted Value")
+    ax.fill_between(x, forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.1)
+    ax.set_ylim(0.3, 0.6)
 
     # mark true and false positives
     if mark_tp_fp:
@@ -191,11 +220,10 @@ async def generate():
     loc3_real_data = pd.read_csv("location3.csv")
     loc3_hack_data = None  # TODO: competing approach
 
-    # TODO: debug baseline
-    evaluate_model_performance([loc1_data, loc2_data], setup="Baseline", mark_tp_fp=True)  # baseline: missing location3 data
-    evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], setup="Rockfish", mark_tp_fp=True)  # rf: use synthetic location3
-    # evaluate_model_performance([loc1_data, loc2_data, loc3_hack_data], title="Hack")  # rf: use hack location3
-    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], setup="Ideal", mark_tp_fp=True)  # ideal: use real location3
+    model = "prophet"
+    evaluate_model_performance([loc1_data, loc2_data], model=model, setup="Baseline", mark_tp_fp=True)  # baseline: missing location3 data
+    evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], model=model, setup="Rockfish", mark_tp_fp=True)  # rf: use synthetic location3
+    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], model=model, setup="Ideal", mark_tp_fp=True)  # ideal: use real location3
 
 
 asyncio.run(generate())
