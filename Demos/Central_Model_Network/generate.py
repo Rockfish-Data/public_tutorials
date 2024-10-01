@@ -7,7 +7,8 @@ import asyncio
 import prophet
 import matplotlib.pyplot as plt
 import numpy as np
-from utils import prophet_fit, get_outliers, prophet_plot
+import pykalman as pk
+from neuralprophet import NeuralProphet
 
 REF_TIME = pd.Timestamp('2023-06-01 00:00:00')
 
@@ -50,6 +51,29 @@ def forecast_using_prophet(data, test, setup=None):
     return forecast
 
 
+def forecast_using_neural_prophet(data, test, setup=None):
+    data['ds'] = pd.to_datetime(data['ds'])
+
+    confidence_level = 0.8
+    boundaries = round((1 - confidence_level) / 2, 2)
+    quantiles = [boundaries, confidence_level + boundaries]
+    model = NeuralProphet(quantiles=quantiles)
+    _ = model.fit(data)
+
+    # make future df that matches test.csv timestamps
+    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
+    future = pd.DataFrame()
+    future['ds'] = new_times
+    future['y'] = [None] * len(new_times)
+
+    # make predictions using learnt model
+    forecast = model.predict(future)
+    forecast = forecast.rename(columns={"yhat1": "yhat", "yhat1 10.0%": "yhat_lower", "yhat1 90.0%": "yhat_upper"})
+    forecast.to_csv(f"forecast_neural_prophet_{setup}.csv")
+
+    return forecast
+
+
 def forecast_using_window(data, test, k=100, setup=None):
     new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
     test['ds'] = new_times
@@ -74,8 +98,30 @@ def forecast_using_window(data, test, k=100, setup=None):
     return forecast
 
 
-def forecast_using_kalman(data, test, setup=None):
-    pass
+def forecast_using_kalman(data, test, feature, setup=None):
+    new_times = test['timestamp_(min)'].apply(lambda x: pd.Timedelta(x, 'min') + REF_TIME)
+    test['ds'] = new_times
+
+    model = pk.KalmanFilter()
+    model.em(data["y"])
+    (filtered_state_means, filtered_state_covariances) = model.filter(data["y"][:100])
+
+    row_list = []
+    for i, ds in enumerate(test["ds"]):
+        y_mean, var = model.filter_update(
+            filtered_state_means[i], filtered_state_covariances[i], test[feature][i + 1]
+        )
+        y_mean = y_mean[0]
+        ci = 3 * var[0][0]
+
+        row = {"ds": ds, "yhat": y_mean, "yhat_lower": y_mean - ci, "yhat_upper": y_mean + ci}
+        row_list.append(row)
+
+    forecast = pd.DataFrame(row_list)
+    forecast.to_csv(f"forecast_kalman_{setup}.csv")
+
+    return forecast
+
 
 
 def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, model="prophet", setup="Baseline",
@@ -85,6 +131,7 @@ def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, mode
     data = data[[feature, 'timestamp']].rename(columns={'timestamp': 'ds', feature: 'y'})
     data['ds'] = pd.to_datetime(data['ds'], format="%Y-%m-%d %H:%M:%S", exact=False)
     data = data.dropna()
+    data = data.drop_duplicates(subset=['ds'])
 
     # load test features and labels
     test = pd.read_csv('test.csv', nrows=test_nrows)
@@ -92,10 +139,12 @@ def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, mode
 
     if model == "prophet":
         forecast = forecast_using_prophet(data, test, setup)
+    elif model == "neural_prophet":
+        forecast = forecast_using_neural_prophet(data, test, setup)
     elif model == "window":
         forecast = forecast_using_window(data, test, k=7500, setup=setup)
-    elif model == "kalman_filter":
-        forecast = None
+    elif model == "kalman":
+        forecast = forecast_using_kalman(data, test, feature, setup)
 
     # get anomaly labels
     pred_labels = np.where(test[feature].between(forecast['yhat_lower'], forecast['yhat_upper']), 0, 1)
@@ -105,8 +154,8 @@ def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, mode
     x = pd.to_datetime(forecast['ds'])  # plot timestamps on x axis
     ax.plot(x, test[feature], 'g', label="True Value")
     ax.plot(x, forecast['yhat'], 'b', label="Predicted Value")
-    ax.set_ylim(.3,.6)
     ax.fill_between(x, forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.1)
+    ax.set_ylim(0.0, 0.6)
 
     # mark true and false positives
     if mark_tp_fp:
