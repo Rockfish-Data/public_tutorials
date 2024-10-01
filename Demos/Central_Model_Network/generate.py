@@ -32,7 +32,10 @@ async def get_synthetic_data(model_to_gen_conf):
 
 
 def forecast_using_prophet(data, test, setup=None):
-    model = prophet.Prophet()
+    if setup == 'Ideal':
+        model = prophet.Prophet(daily_seasonality=True,changepoint_prior_scale=.75, interval_width=.95)
+    else:
+        model = prophet.Prophet(daily_seasonality=True)
     model.fit(data)
 
     # make future df that matches test.csv timestamps
@@ -102,6 +105,7 @@ def evaluate_model_performance(data, feature="feature_15", test_nrows=5000, mode
     x = pd.to_datetime(forecast['ds'])  # plot timestamps on x axis
     ax.plot(x, test[feature], 'g', label="True Value")
     ax.plot(x, forecast['yhat'], 'b', label="Predicted Value")
+    ax.set_ylim(.3,.6)
     ax.fill_between(x, forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.1)
 
     # mark true and false positives
@@ -139,10 +143,10 @@ async def generate():
     loc3_hack_data = None  # TODO: competing approach
 
     # TODO: debug baseline
-    evaluate_model_performance([loc1_data, loc2_data], model="window", setup="Baseline")  # baseline: missing location3 data
-    # evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], title="Rockfish")  # rf: use synthetic location3
+    evaluate_model_performance([loc1_data, loc2_data], setup="Baseline", mark_tp_fp=True)  # baseline: missing location3 data
+    evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], setup="Rockfish", mark_tp_fp=True)  # rf: use synthetic location3
     # evaluate_model_performance([loc1_data, loc2_data, loc3_hack_data], title="Hack")  # rf: use hack location3
-    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], model="window", setup="Ideal")  # ideal: use real location3
+    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], setup="Ideal", mark_tp_fp=True)  # ideal: use real location3
 
 
 asyncio.run(generate())
