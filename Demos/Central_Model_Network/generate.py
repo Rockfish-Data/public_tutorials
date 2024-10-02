@@ -10,6 +10,8 @@ import pykalman as pk
 import rockfish as rf
 import rockfish.actions as ra
 from neuralprophet import NeuralProphet
+from sklearn.metrics import f1_score, confusion_matrix
+
 
 REF_TIME = pd.Timestamp("2023-06-01 00:00:00")
 
@@ -174,9 +176,7 @@ def evaluate_model_performance(
         forecast = forecast_using_kalman(data, test, feature, setup)
 
     # get anomaly labels
-    pred_labels = np.where(
-        test[feature].between(forecast["yhat_lower"], forecast["yhat_upper"]), 0, 1
-    )
+    pred_labels = np.where(test[feature] <= forecast["yhat_upper"], 0, 1)
 
     # plot
     fig, ax = plt.subplots()
@@ -184,18 +184,25 @@ def evaluate_model_performance(
     ax.plot(x, test[feature], "g", label="True Value")
     ax.plot(x, forecast["yhat"], "b", label="Predicted Value")
     ax.fill_between(x, forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.1)
-    ax.set_ylim(0.3, 0.6)
+    ax.set_ylim(0.3, 0.65)
 
     # mark true and false positives
     if mark_tp_fp:
-        tp_idxs = np.where((test_labels['label'] == 1) & (pred_labels == 1))[0]  # get idxs for true positives
-        fp_idxs = np.where((test_labels['label'] == 0) & (pred_labels == 1))[0]  # get idxs for false positives
+        tp_idxs = np.where((test_labels["label"] == 1) & (pred_labels == 1))[0]  # get idxs for true positives
+        fp_idxs = np.where((test_labels["label"] == 0) & (pred_labels == 1))[0]  # get idxs for false positives
         ax.plot(x.iloc[tp_idxs], test[feature].iloc[tp_idxs], "r.", label="True Anomaly")
         ax.plot(x.iloc[fp_idxs], test[feature].iloc[fp_idxs], "k.", label="False Anomaly")
 
     ax.legend()
     plt.title(f"{model}, {setup}")
     plt.show()
+
+    # compute and return f1 score
+    print(f"Setup: {setup}")
+    print(f"F1 Score: {f1_score(y_true=test_labels['label'], y_pred=pred_labels):.2f}")
+    tn, fp, fn, tp = confusion_matrix(y_true=test_labels["label"], y_pred=pred_labels).ravel()
+    print(f"TP: {tp}, FP: {fp}")
+    print(f"True Positive Rate: {((tp / (tp + fn)) * 100):.2f}%")
 
 
 async def generate():
@@ -221,9 +228,27 @@ async def generate():
     loc3_hack_data = None  # TODO: competing approach
 
     model = "prophet"
-    evaluate_model_performance([loc1_data, loc2_data], model=model, setup="Baseline", mark_tp_fp=True)  # baseline: missing location3 data
-    evaluate_model_performance([loc1_data, loc2_data, loc3_syn_data], model=model, setup="Rockfish", mark_tp_fp=True)  # rf: use synthetic location3
-    evaluate_model_performance([loc1_data, loc2_data, loc3_real_data], model=model, setup="Ideal", mark_tp_fp=True)  # ideal: use real location3
+
+    # baseline: missing location3 data
+    evaluate_model_performance(
+        [loc1_data, loc2_data], model=model, setup="Baseline", mark_tp_fp=True
+    )
+
+    # rf: use synthetic location3
+    evaluate_model_performance(
+        [loc1_data, loc2_data, loc3_syn_data],
+        model=model,
+        setup="Rockfish",
+        mark_tp_fp=True
+    )
+
+    # ideal: use real location3
+    evaluate_model_performance(
+        [loc1_data, loc2_data, loc3_real_data],
+        model=model,
+        setup="Ideal",
+        mark_tp_fp=True
+    )
 
 
 asyncio.run(generate())
