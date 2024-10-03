@@ -26,9 +26,10 @@ async def runtime():
         print(f"Training model {i} on {path}")
 
     # optional: add labels
+    labels = ["model1"]  # ONLY CHANGE THIS PER DEMO USE CASE, example: ["jan_data.csv", "feb_data.csv"]
     for i, path in enumerate(dataset_paths):
         model = await runtime_workflow.models().nth(i)
-        await model.add_labels(conn, kind=path)
+        await model.add_labels(conn, kind=labels[i])
         print(f"Finished training model {i} on {path}")
 
 asyncio.run(runtime())
