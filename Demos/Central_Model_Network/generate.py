@@ -128,14 +128,14 @@ async def generate():
             "model": f"model_{path[10:-4]}"
         }
 
-    syn_data = await get_synthetic_data(generate_conf)
-    syn_data.to_pandas().to_csv(f"loc3_syn_tabgan_{start_idx}.csv", index=False)
-
-    exit(0)
+    # syn_data = await get_synthetic_data(generate_conf)
+    # syn_data.to_pandas().to_csv(f"loc3_syn_tabgan_{start_idx}.csv", index=False)
+    #
+    # exit(0)
 
     loc1_data = pd.read_csv("location1.csv")
     loc2_data = pd.read_csv("location2.csv")
-    loc3_syn_data = pd.read_csv("syn_data.csv")
+    loc3_syn_data = pd.read_csv("new_syn.csv")
     loc3_real_data = pd.read_csv("location3.csv")
     loc3_hack_data = None  # TODO: competing approach
 
