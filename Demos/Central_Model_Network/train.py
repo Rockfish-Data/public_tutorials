@@ -2,6 +2,8 @@ import time
 import rockfish as rf
 import asyncio
 import pickle
+from pathlib import Path
+
 
 async def runtime():
     # connect to Rockfish platform
@@ -17,26 +19,29 @@ async def runtime():
 
     # stream datasets to model
     # data files location https://drive.google.com/drive/folders/1PqESQgLIrz-ztBc9UoH5kZpqIwu9GFyd?usp=sharing
-    dataset_paths = [
-        "location3_hours/location3_2023-08-06_hour00.csv",
-        "location3_hours/location3_2023-08-06_hour01.csv"
-    ]
+    dirpath = Path("location3_hours")
+    dataset_paths = sorted([
+        file.name for file in dirpath.glob('location3_*.csv')
+        if not file.name.endswith('_timestamp.csv')
+    ])
+    start_idx = 60
+    end_idx = 90
+    dataset_paths = dataset_paths[start_idx:end_idx]
+
     for i, path in enumerate(dataset_paths):
-        dataset = rf.Dataset.from_csv("train", path)
+        dataset = rf.Dataset.from_csv("train", f"location3_hours/{path}")
         await runtime_workflow.write_datastream(datastream, dataset)
         print(f"Training model {i} on {path}")
 
     time.sleep(10)
 
-    # optional: add labels
+    # add labels
     # TODO: share location3 models with central
-    labels = [
-        "model_location3_2023-08-06_hour00",
-        "model_location3_2023-08-06_hour01",
-    ]
     for i, path in enumerate(dataset_paths):
         model = await runtime_workflow.models().nth(i)
-        await model.add_labels(conn, kind=labels[i])
+        label = path[10:-4]
+        await model.add_labels(conn, kind=f"model_{label}")
+        print(model)
         print(f"Finished training model {i} on {path}")
 
 asyncio.run(runtime())

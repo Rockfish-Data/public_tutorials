@@ -1,5 +1,6 @@
 import asyncio
 import pickle
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,22 +29,24 @@ async def get_synthetic_data(generate_conf):
         generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
 
         model = await conn.list_models(
-            labels={"kind": model_label, "workflow_id": "5CCxuX4EGLJvG3qSYhPC9p"}
+            labels={"kind": model_label, "workflow_id": "2VwGO12StbIHtb3opDhRdq"}
         ).last()
 
         builder = rf.WorkflowBuilder()
         builder.add_path(model, generate_conf, ra.DatasetSave(name="synthetic"))
         workflow = await builder.start(conn)
 
+        filename = model_label[6:]
+
         # save syn data for quality checks
         syn_dataset = (await workflow.datasets().concat(conn)).table
-        filename = model_label[6:]
-        syn_dataset.to_pandas().to_csv(f"syn_location3_hours/{filename}.csv", index=False)
-
-        # add timestamps to syn data
-        timestamps = pd.read_csv(f"location3_hours/{filename}_timestamp.csv")[
+        timestamps = pd.read_csv(f"location3_hours/location3_{filename}_timestamp.csv")[
             "timestamp"
         ].to_list()
+        syn_dataset = syn_dataset.slice(length=len(timestamps)) # keep len the same as real timestamp len
+        syn_dataset.to_pandas().to_csv(f"syn_location3_hours/location3_{filename}.csv", index=False)
+
+        # add timestamps to syn data
         syn_dataset = syn_dataset.append_column("timestamp", [timestamps])
         syn_datasets.append(syn_dataset)
 
@@ -109,12 +112,23 @@ def evaluate_model_performance(
 
 
 async def generate():
-    generate_conf = {
-        "source1": {"model": "model_location3_2023-08-06_hour00"},
-        "source2": {"model": "model_location3_2023-08-06_hour01"},
-    }
+    dirpath = Path("location3_hours")
+    dataset_paths = sorted([
+        file.name for file in dirpath.glob('location3_*.csv')
+        if not file.name.endswith('_timestamp.csv')
+    ])
+    start_idx = 30
+    end_idx = 60
+    dataset_paths = dataset_paths[start_idx:end_idx]
+
+    generate_conf = {}
+    for i, path in enumerate(dataset_paths):
+        generate_conf[f"source{i}"] = {
+            "model": f"model_{path[10:-4]}"
+        }
+
     syn_data = await get_synthetic_data(generate_conf)
-    syn_data.to_pandas().to_csv("test_tab_gan.csv", index=False)
+    syn_data.to_pandas().to_csv(f"loc3_syn_tabgan_{start_idx}.csv", index=False)
 
     exit(0)
 

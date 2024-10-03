@@ -49,5 +49,5 @@ runtime_conf = get_rf_recommended_workflow(
     filepath=sample_data_filepath,
     privacy_requirements={},
     fidelity_requirements={},
-    model_customizations={'epochs': 50}
+    model_customizations={'epochs': 200}
 )
