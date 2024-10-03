@@ -11,11 +11,12 @@ async def get_synthetic_data(generate_conf):
     syn_datasets = []
     for source, params in generate_conf.items():
         model_label = params["model"]
-        print(f"Generating from model {model_label} with params = {params}")
+        print(f"Generating from {model_label}")
         generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
 
         # USUALLY IN THE DEMO WE WOULD SHOW GENERATION LIVE, SO PUT A WORKFLOW_ID HERE WITH ALREADY TRAINED MODELS
         model = await conn.list_models(labels={"kind": model_label, "workflow_id": "3HnOxCXK5OO7MpHEzYRee5"}).last()
+        print(model)
 
         builder = rf.WorkflowBuilder()
         builder.add_path(model, generate_conf, ra.DatasetSave(name="synthetic"))
@@ -28,7 +29,7 @@ async def generate():
     # ONLY CHANGE THIS PER DEMO USE CASE
     # e.g. for product demo, we want to show blending and amplification
     #      for AI model training, we want to show generating missing location data
-    model_label_to_gen_conf = {
+    generate_conf = {
         "source1": {
             "start_time": "",
             "end_time": "",
@@ -49,7 +50,7 @@ async def generate():
         #     "sessions": 1500,
         # }
     }
-    syn_data = await get_synthetic_data(model_label_to_gen_conf)
+    syn_data = await get_synthetic_data(generate_conf)
 
     # DOWNSTREAM CODE THAT USES SYN DATA GOES HERE
     # e.g. for product demo, save syn_data to file

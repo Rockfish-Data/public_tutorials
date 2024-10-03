@@ -35,9 +35,13 @@ async def get_synthetic_data(generate_conf):
         builder.add_path(model, generate_conf, ra.DatasetSave(name="synthetic"))
         workflow = await builder.start(conn)
 
+        # save syn data for quality checks
         syn_dataset = (await workflow.datasets().concat(conn)).table
-        ts_filename = model_label[6:]
-        timestamps = pd.read_csv(f"location3_hours/{ts_filename}_timestamp.csv")[
+        filename = model_label[6:]
+        syn_dataset.to_pandas().to_csv(f"syn_location3_hours/{filename}.csv", index=False)
+
+        # add timestamps to syn data
+        timestamps = pd.read_csv(f"location3_hours/{filename}_timestamp.csv")[
             "timestamp"
         ].to_list()
         syn_dataset = syn_dataset.append_column("timestamp", [timestamps])
@@ -110,7 +114,7 @@ async def generate():
         "source2": {"model": "model_location3_2023-08-06_hour01"},
     }
     syn_data = await get_synthetic_data(generate_conf)
-    syn_data.to_pandas().to_csv("test_tab_gan.csv")
+    syn_data.to_pandas().to_csv("test_tab_gan.csv", index=False)
 
     exit(0)
 
