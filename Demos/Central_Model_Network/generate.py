@@ -52,7 +52,7 @@ async def get_synthetic_data(generate_conf):
 
 def evaluate_model_performance(
     data,
-    feature="feature_15",
+    feature="feature_9",
     test_nrows=5000,
     model="prophet",
     setup="Baseline",
@@ -87,7 +87,7 @@ def evaluate_model_performance(
     ax.plot(x, test[feature], "g", label="True Value")
     ax.plot(x, forecast["yhat"], "b", label="Predicted Value")
     ax.fill_between(x, forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.1)
-    ax.set_ylim(0.3, 0.65)
+    ax.set_ylim(0.4, 1)
 
     # mark true and false positives
     if mark_tp_fp:
@@ -106,6 +106,7 @@ def evaluate_model_performance(
     tn, fp, fn, tp = confusion_matrix(y_true=test_labels["label"], y_pred=pred_labels).ravel()
     print(f"TP: {tp}, FP: {fp}")
     print(f"True Positive Rate: {((tp / (tp + fn)) * 100):.2f}%")
+    print(f'Accuracy: {((tp + tn) / (tp + tn + fp + fn) * 100):.2f}%')
 
 
 async def generate():
@@ -113,10 +114,10 @@ async def generate():
         "source1": {"model": "model_location3_2023-08-06_hour00"},
         "source2": {"model": "model_location3_2023-08-06_hour01"},
     }
-    syn_data = await get_synthetic_data(generate_conf)
-    syn_data.to_pandas().to_csv("test_tab_gan.csv", index=False)
+    # syn_data = await get_synthetic_data(generate_conf)
+    # syn_data.to_pandas().to_csv("test_tab_gan.csv", index=False)
 
-    exit(0)
+    # exit(0)
 
     loc1_data = pd.read_csv("location1.csv")
     loc2_data = pd.read_csv("location2.csv")
@@ -132,12 +133,12 @@ async def generate():
     )
 
     # rf: use synthetic location3
-    evaluate_model_performance(
-        [loc1_data, loc2_data, loc3_syn_data],
-        model=model,
-        setup="Rockfish",
-        mark_tp_fp=True,
-    )
+    # evaluate_model_performance(
+    #     [loc1_data, loc2_data, loc3_syn_data],
+    #     model=model,
+    #     setup="Rockfish",
+    #     mark_tp_fp=True,
+    # )
 
     # ideal: use real location3
     evaluate_model_performance(
