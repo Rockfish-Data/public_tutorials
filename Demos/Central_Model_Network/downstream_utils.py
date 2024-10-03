@@ -14,6 +14,7 @@ def forecast_using_prophet(data, test, setup=None):
         model = prophet.Prophet(daily_seasonality=True, changepoint_prior_scale=.25)
     else:
         model = prophet.Prophet(daily_seasonality=True)
+    np.random.seed(500)
     model.fit(data)
 
     # make future df that matches test.csv timestamps

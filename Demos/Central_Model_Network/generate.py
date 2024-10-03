@@ -55,7 +55,7 @@ async def get_synthetic_data(generate_conf):
 
 def evaluate_model_performance(
     data,
-    feature="feature_15",
+    feature="feature_9",
     test_nrows=5000,
     model="prophet",
     setup="Baseline",
@@ -90,7 +90,7 @@ def evaluate_model_performance(
     ax.plot(x, test[feature], "g", label="True Value")
     ax.plot(x, forecast["yhat"], "b", label="Predicted Value")
     ax.fill_between(x, forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.1)
-    ax.set_ylim(0.3, 0.65)
+    ax.set_ylim(0.4, 1)
 
     # mark true and false positives
     if mark_tp_fp:
@@ -109,6 +109,7 @@ def evaluate_model_performance(
     tn, fp, fn, tp = confusion_matrix(y_true=test_labels["label"], y_pred=pred_labels).ravel()
     print(f"TP: {tp}, FP: {fp}")
     print(f"True Positive Rate: {((tp / (tp + fn)) * 100):.2f}%")
+    print(f'Accuracy: {((tp + tn) / (tp + tn + fp + fn) * 100):.2f}%')
 
 
 async def generate():
