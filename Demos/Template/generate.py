@@ -4,13 +4,14 @@ import pyarrow as pa
 import pickle
 import asyncio
 
-async def get_synthetic_data(model_to_gen_conf):
+async def get_synthetic_data(generate_conf):
     # connect to Rockfish platform
     conn = rf.Connection.from_config()
 
     syn_datasets = []
-    for model_label, gen_params in model_to_gen_conf.items():
-        print(f"generating from model {model_label} with params = {gen_params}")
+    for source, params in generate_conf.items():
+        model_label = params["model"]
+        print(f"Generating from model {model_label} with params = {params}")
         generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
 
         # USUALLY IN THE DEMO WE WOULD SHOW GENERATION LIVE, SO PUT A WORKFLOW_ID HERE WITH ALREADY TRAINED MODELS
@@ -28,15 +29,24 @@ async def generate():
     # e.g. for product demo, we want to show blending and amplification
     #      for AI model training, we want to show generating missing location data
     model_label_to_gen_conf = {
-        "test.csv": {
+        "source1": {
+            "start_time": "",
+            "end_time": "",
+            "model": "model1",
             "sessions": 1500,
         },
         # EXAMPLE:
-        # "jan": {
+        # "source1": {
+        #     "start_time": "",
+        #     "end_time": "",
+        #     "model": "model1",
         #     "sessions": 500,
         # }
-        # "feb": {
-        #     "sessions": 500,
+        # "source2": {
+        #     "start_time": "",
+        #     "end_time": "",
+        #     "model": "model2",
+        #     "sessions": 1500,
         # }
     }
     syn_data = await get_synthetic_data(model_label_to_gen_conf)
