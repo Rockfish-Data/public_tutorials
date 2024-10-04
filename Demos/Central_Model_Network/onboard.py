@@ -1,12 +1,27 @@
+import asyncio
+
 import rockfish as rf
 import rockfish.actions as ra
+import rockfish.labs as rl
 from rockfish.labs.dataset_properties import DatasetPropertyExtractor, DatasetType
 from rockfish.labs.recommender import ModelType
 from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
 
 
-def get_rf_recommended_workflow(
+async def compute_fidelity(dataset, recommender_output):
+    conn = rf.Connection.from_config()
+    builder = rf.WorkflowBuilder()
+    builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
+    workflow = await builder.start(conn)
+
+    syn = await (await workflow.datasets().last()).to_local(conn)
+
+    fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
+    return fidelity_score
+
+
+async def get_rf_recommended_workflow(
         filepath, session_key=None, metadata_fields=None,
         privacy_requirements=None, fidelity_requirements=None,
         model_customizations=None
@@ -31,6 +46,10 @@ def get_rf_recommended_workflow(
         config[k] = v
         print(f'{k}: {v}')
 
+    print('\nEvaluating Synthetic Data Quality:')
+    fidelity_score = await compute_fidelity(dataset, recommender_output)
+    print(f'Fidelity Score: {fidelity_score:.4f}')
+
     # SAVE RUNNING WORKFLOW BUILDER (with preprocess + train actions, because this won't change per model)
     runtime_conf = rf.WorkflowBuilder()
     runtime_conf.add_path(ra.DatastreamLoad(), *recommender_output.actions[:-1])
@@ -45,9 +64,11 @@ sample_data_filepath = "location3_hours/location3_2023-08-06_hour00.csv"
 
 # ONLY CHANGE THIS PER DEMO USE CASE
 # e.g. for AI model training, no need for privacy_requirements
-runtime_conf = get_rf_recommended_workflow(
-    filepath=sample_data_filepath,
-    privacy_requirements={},
-    fidelity_requirements={},
-    model_customizations={'epochs': 200}
+asyncio.run(
+    get_rf_recommended_workflow(
+        filepath=sample_data_filepath,
+        privacy_requirements={},
+        fidelity_requirements={},
+        model_customizations={'epochs': 200}
+    )
 )
