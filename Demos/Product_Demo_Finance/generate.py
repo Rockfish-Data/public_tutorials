@@ -3,8 +3,20 @@ import rockfish.actions as ra
 import pyarrow as pa
 import pickle
 import asyncio
+import requests
 
-from rockfish.arrow import concat_tables
+def upload_data(dataset, dbrx_url, table_name):
+    databricks_token = "{{ secret.databricks_token }}"
+    response = requests.post(
+        f"https://dbc-224b2644-c532.cloud.databricks.com/api/2.0/dbfs/put",
+        headers={"Authorization": f"Bearer {databricks_token}"},
+        data={"path": dbrx_url, "overwrite": "true"},
+        files=dataset,
+    )
+    if response.status_code == 200:
+        print(f"File uploaded to {dbrx_url}")
+    else:
+        print(f"Upload failed: {response.text}")
 
 
 async def get_synthetic_data(model_to_gen_conf):
@@ -37,23 +49,26 @@ async def get_synthetic_data(model_to_gen_conf):
     return pa.concat_tables(syn_datasets)
 
 async def generate():
-    # TODO: introduce this story in the beginning
-    model_label_to_gen_conf = {
-        "week1": {
-            # start:
-            # end:
-            # model:
-            "sessions": 250,
-            # TODO: accept/retain time range
+    generate_conf = {
+        "source1": {
+            "start_time": "2023-08-08 09:00:00",
+            "end_time": "2023-08-08 18:00:00",
+            "model": "model_normal_transactions",
+            "sessions": 1500,
         },
-        "week2": {
+        "source2": {
+            "start_time": "2023-08-08 12:30:00",
+            "end_time": "2023-08-08 14:30:00",
+            "model": "model_abnormal_transactions",
             "sessions": 500,
-            # TODO: accept/retain time range
         },
     }
-    syn_data = await get_synthetic_data(model_label_to_gen_conf)
+    syn_data = await get_synthetic_data(generate_conf)
 
-    # TODO: show connector
-    pa.csv.write_csv(syn_data, "synthetic.csv")
+    upload_data(
+        dataset=syn_data,
+        dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
+        table_name="demo_transactions"
+    )
 
 asyncio.run(generate())

@@ -6,8 +6,16 @@ from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
 
 
+def get_dataset(dbrx_url, table_name):
+    return ra.DatabricksSqlLoad(
+        token="{{ secret.databricks_token }}",
+        http_path="TBD",
+        server_hostname=dbrx_url,
+        sql=f"SELECT * FROM rockfish_data_dev.default.{table_name}",
+    )
+
 def get_rf_recommended_workflow(
-        filepath, session_key, metadata_fields,
+        dataset, session_key, metadata_fields,
         privacy_requirements, fidelity_requirements
 ):
     dataset = rf.Dataset.from_csv("sample_data", filepath)
@@ -39,13 +47,15 @@ def get_rf_recommended_workflow(
 
     return runtime_conf
 
-# TODO: download from databricks using HTTP
-sample_data_filepath = "transactions_week1.csv"
+sample_data = get_dataset(
+    dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
+    table_name="transactions_week1"
+)
 
 runtime_conf = get_rf_recommended_workflow(
-    filepath=sample_data_filepath,
+    dataset=sample_data,
     session_key="customer",
     metadata_fields = ["age", "email", "gender"],
     privacy_requirements = {"mask": ["email"]},
-    fidelity_requirements = {}
+    fidelity_requirements = {"amount BETWEEN 0.0 AND 500.0"}
 )

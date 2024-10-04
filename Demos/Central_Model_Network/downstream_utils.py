@@ -8,12 +8,7 @@ REF_TIME = pd.Timestamp("2023-06-01 00:00:00")
 
 
 def forecast_using_prophet(data, test, setup=None):
-    if setup == "Ideal":
-        model = prophet.Prophet(daily_seasonality=True, )
-    elif setup == "Baseline":
-        model = prophet.Prophet(daily_seasonality=True,)
-    else:
-        model = prophet.Prophet(daily_seasonality=True)
+    model = prophet.Prophet(daily_seasonality=True)
     np.random.seed(500)
     model.fit(data)
 

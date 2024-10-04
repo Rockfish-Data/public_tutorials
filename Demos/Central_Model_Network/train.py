@@ -24,16 +24,15 @@ async def runtime():
         file.name for file in dirpath.glob('location3_*.csv')
         if not file.name.endswith('_timestamp.csv')
     ])
-    start_idx = 0
-    end_idx = 216
-    dataset_paths = dataset_paths[start_idx:end_idx]
+    # start_idx = 30
+    # end_idx = 35
+    # dataset_paths = dataset_paths[start_idx:end_idx]
 
     for i, path in enumerate(dataset_paths):
         dataset = rf.Dataset.from_csv("train", f"location3_hours/{path}")
         await runtime_workflow.write_datastream(datastream, dataset)
+        time.sleep(10)
         print(f"Training model {i} on {path}")
-
-    time.sleep(10)
 
     # add labels
     # TODO: share location3 models with central
