@@ -90,7 +90,7 @@ def evaluate_model_performance(
     ax.plot(x, test[feature], "g", label="True Value")
     ax.plot(x, forecast["yhat"], "b", label="Predicted Value")
     ax.fill_between(x, forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.1)
-    ax.set_ylim(0.4, 1)
+    ax.set_ylim(0.4, 1.03)
 
     # mark true and false positives
     if mark_tp_fp:
@@ -100,7 +100,10 @@ def evaluate_model_performance(
         ax.plot(x.iloc[fp_idxs], test[feature].iloc[fp_idxs], "k.", label="False Anomaly")
 
     ax.legend()
-    plt.title(f"{model}, {setup}")
+    plt.xticks([])
+    plt.xlabel("Time")
+    plt.ylabel("Normalized Feature_9")
+    plt.title(f"{setup}")
     plt.show()
 
     # compute and return f1 score
@@ -109,6 +112,7 @@ def evaluate_model_performance(
     tn, fp, fn, tp = confusion_matrix(y_true=test_labels["label"], y_pred=pred_labels).ravel()
     print(f"TP: {tp}, FP: {fp}")
     print(f"True Positive Rate: {((tp / (tp + fn)) * 100):.2f}%")
+    print(f"False Positive Rate: {((fp / (tn + fp)) * 100):.2f}%")
     print(f'Accuracy: {((tp + tn) / (tp + tn + fp + fn) * 100):.2f}%')
 
 
@@ -137,13 +141,13 @@ async def generate():
     loc2_data = pd.read_csv("location2.csv")
     loc3_syn_data = pd.read_csv("new_syn.csv")
     loc3_real_data = pd.read_csv("location3.csv")
-    loc3_hack_data = None  # TODO: competing approach
+    loc3_hack_data = pd.read_csv('competitive_syn_data.csv')
 
     model = "prophet"
 
     # baseline: missing location3 data
     evaluate_model_performance(
-        [loc1_data, loc2_data], model=model, setup="Baseline", mark_tp_fp=True
+        [loc1_data, loc2_data], model=model, setup="No Sharing", mark_tp_fp=True
     )
 
     # rf: use synthetic location3
@@ -158,7 +162,15 @@ async def generate():
     evaluate_model_performance(
         [loc1_data, loc2_data, loc3_real_data],
         model=model,
-        setup="Ideal",
+        setup="Ideal Case",
+        mark_tp_fp=True,
+    )
+
+    #competitive: use competitive_syn
+    evaluate_model_performance(
+        [loc1_data, loc2_data, loc3_hack_data],
+        model=model,
+        setup='Naive Synthetic',
         mark_tp_fp=True,
     )
 
