@@ -100,7 +100,10 @@ def evaluate_model_performance(
         ax.plot(x.iloc[fp_idxs], test[feature].iloc[fp_idxs], "k.", label="False Anomaly")
 
     ax.legend()
-    plt.title(f"{model}, {setup}")
+    plt.xticks([])
+    plt.xlabel("Time")
+    plt.ylabel("Normalized Feature_9")
+    plt.title(f"{setup}")
     plt.show()
 
     # compute and return f1 score
@@ -144,7 +147,7 @@ async def generate():
 
     # baseline: missing location3 data
     evaluate_model_performance(
-        [loc1_data, loc2_data], model=model, setup="Baseline", mark_tp_fp=True
+        [loc1_data, loc2_data], model=model, setup="No Sharing", mark_tp_fp=True
     )
 
     # rf: use synthetic location3
@@ -159,7 +162,7 @@ async def generate():
     evaluate_model_performance(
         [loc1_data, loc2_data, loc3_real_data],
         model=model,
-        setup="Ideal",
+        setup="Ideal Case",
         mark_tp_fp=True,
     )
 
@@ -167,7 +170,7 @@ async def generate():
     evaluate_model_performance(
         [loc1_data, loc2_data, loc3_hack_data],
         model=model,
-        setup='Competitive',
+        setup='Naive Synthetic',
         mark_tp_fp=True,
     )
 
