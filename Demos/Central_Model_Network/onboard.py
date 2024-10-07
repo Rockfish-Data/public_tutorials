@@ -4,7 +4,6 @@ import rockfish as rf
 import rockfish.actions as ra
 import rockfish.labs as rl
 from rockfish.labs.dataset_properties import DatasetPropertyExtractor, DatasetType
-from rockfish.labs.recommender import ModelType
 from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
 
