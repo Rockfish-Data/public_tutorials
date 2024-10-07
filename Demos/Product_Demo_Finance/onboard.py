@@ -18,19 +18,7 @@ def get_dataset(dbrx_url, table_name):
     )
 
 
-async def run_data_quality_checks(dataset, actions, fidelity_requirements):
-    # conn = rf.Connection.from_config("prod")
-    # builder = rf.WorkflowBuilder()
-    # builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
-    # workflow = await builder.start(conn)
-    # print(f"Workflow ID: {workflow.id()}")
-    # syn = await (await workflow.datasets().last()).to_local(conn)
-    # syn.to_pandas().to_csv("transactions_2023-08-01_hour09_syn.csv", index=False)
-    syn = rf.Dataset.from_csv(
-        "transactions_2023-08-01_hour09_syn",
-        "transactions_2023-08-01_hour09_syn.csv"
-    )
-
+def data_quality_check(dataset, syn, fidelity_requirements):
     plot_configs = [
         {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
         {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
@@ -47,10 +35,10 @@ async def run_data_quality_checks(dataset, actions, fidelity_requirements):
         plt.show()
 
 
-
 async def get_rf_recommended_workflow(
         dataset, session_key, metadata_fields,
-        privacy_requirements, fidelity_requirements
+        privacy_requirements, fidelity_requirements,
+        run_workflow=False
 ):
     dataset_properties = DatasetPropertyExtractor(
         dataset=dataset,
@@ -72,6 +60,7 @@ async def get_rf_recommended_workflow(
         )
         remap_actions.append(remap)
 
+    # this was obtained after "tuning"
     train_action = recommender_output.actions[0]
     train_action.config().doppelganger.batch_size = 512
     train_action.config().doppelganger.epoch = 100
@@ -87,12 +76,15 @@ async def get_rf_recommended_workflow(
 
     pickle.dump(recommender_output.actions[-1], open('generate_conf.pkl', 'wb'))
 
-    await run_data_quality_checks(
-        dataset,
-        [*list(runtime_conf.actions.values())[1:], recommender_output.actions[-1]],
-        fidelity_requirements
-    )
-
+    if run_workflow:
+        actions = [*list(runtime_conf.actions.values())[1:], recommender_output.actions[-1]]
+        conn = rf.Connection.from_config("prod")
+        builder = rf.WorkflowBuilder()
+        builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
+        workflow = await builder.start(conn)
+        print(f"Workflow ID: {workflow.id()}")
+        syn_data = await (await workflow.datasets().last()).to_local(conn)
+        syn_data.to_pandas().to_csv(f"{dataset.name}_syn.csv", index=False)
     return runtime_conf
 
 # sample_data = get_dataset(
@@ -101,6 +93,11 @@ async def get_rf_recommended_workflow(
 # )
 
 sample_data = rf.Dataset.from_csv("transactions_2023-08-01_hour09", "transactions_2023-08-01_hour09.csv")
+fidelity_requirements = [
+    "SELECT COUNT(fraud) AS fraud, category FROM my_table WHERE fraud = 1 GROUP BY category",
+    "SELECT COUNT(fraud) AS fraud, age, gender FROM my_table WHERE fraud = 1 GROUP BY age, gender",
+    "SELECT COUNT(fraud) AS fraud, merchant FROM my_table WHERE fraud = 1 GROUP BY merchant",
+]
 
 asyncio.run(
     get_rf_recommended_workflow(
@@ -108,10 +105,13 @@ asyncio.run(
         session_key="customer",
         metadata_fields = ["age", "email", "gender"],
         privacy_requirements = {"email": "mask"},
-        fidelity_requirements = [
-            "SELECT COUNT(fraud) AS fraud, category FROM my_table WHERE fraud = 1 GROUP BY category",
-            "SELECT COUNT(fraud) AS fraud, age, gender FROM my_table WHERE fraud = 1 GROUP BY age, gender",
-            "SELECT COUNT(fraud) AS fraud, merchant FROM my_table WHERE fraud = 1 GROUP BY merchant",
-        ]
+        fidelity_requirements = fidelity_requirements
     )
 )
+
+# run the onboarding workflow to create syn data
+syn = rf.Dataset.from_csv(
+    "transactions_2023-08-01_hour09_syn",
+    "transactions_2023-08-01_hour09_syn.csv"
+)
+data_quality_check(sample_data, syn, fidelity_requirements)
