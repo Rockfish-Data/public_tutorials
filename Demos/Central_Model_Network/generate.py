@@ -40,7 +40,7 @@ async def get_synthetic_data(generate_conf):
 
         # save syn data for quality checks
         syn_dataset = (await workflow.datasets().concat(conn)).table
-        timestamps = pd.read_csv(f"location3_hours/location3_{filename}_timestamp.csv")[
+        timestamps = pd.read_csv(f"datafiles/location3_hours/location3_{filename}_timestamp.csv")[
             "timestamp"
         ].to_list()
         syn_dataset = syn_dataset.slice(length=len(timestamps)) # keep len the same as real timestamp len
@@ -69,8 +69,8 @@ def evaluate_model_performance(
     data = data.drop_duplicates(subset=["ds"], keep="first").sort_values(by="ds")
 
     # load test features and labels
-    test = pd.read_csv("test.csv", nrows=test_nrows)
-    test_labels = pd.read_csv("test_label.csv", nrows=test_nrows)
+    test = pd.read_csv("datafiles/test.csv", nrows=test_nrows)
+    test_labels = pd.read_csv("datafiles/test_label.csv", nrows=test_nrows)
 
     if model == "prophet":
         forecast = forecast_using_prophet(data, test, setup)
@@ -117,7 +117,7 @@ def evaluate_model_performance(
 
 
 async def generate():
-    dirpath = Path("location3_hours")
+    dirpath = Path("datafiles/location3_hours")
     dataset_paths = sorted([
         file.name for file in dirpath.glob('location3_*.csv')
         if not file.name.endswith('_timestamp.csv')
@@ -137,11 +137,11 @@ async def generate():
     #
     # exit(0)
 
-    loc1_data = pd.read_csv("location1.csv")
-    loc2_data = pd.read_csv("location2.csv")
-    loc3_syn_data = pd.read_csv("new_syn.csv")
-    loc3_real_data = pd.read_csv("location3.csv")
-    loc3_hack_data = pd.read_csv('competitive_syn_data.csv')
+    loc1_data = pd.read_csv("datafiles/location1.csv")
+    loc2_data = pd.read_csv("datafiles/location2.csv")
+    loc3_syn_data = pd.read_csv("datafiles/new_syn.csv")
+    loc3_real_data = pd.read_csv("datafiles/location3.csv")
+    loc3_hack_data = pd.read_csv('datafiles/competitive_syn_data.csv')
 
     model = "prophet"
 

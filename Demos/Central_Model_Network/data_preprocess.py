@@ -1,6 +1,6 @@
 import pandas as pd
 
-loc3_filepath = "location3.csv"
+loc3_filepath = "datafiles/location3.csv"
 loc3_data = pd.read_csv(loc3_filepath)
 loc3_data["timestamp"] = pd.to_datetime(loc3_data["timestamp"])
 loc3_data = loc3_data.drop(columns=["sessionID"])

@@ -59,7 +59,7 @@ async def get_rf_recommended_workflow(
     return runtime_conf
 
 
-sample_data_filepath = "location3_hours/location3_2023-08-06_hour00.csv"
+sample_data_filepath = "datafiles/location3_hours/location3_2023-08-06_hour00.csv"
 
 # ONLY CHANGE THIS PER DEMO USE CASE
 # e.g. for AI model training, no need for privacy_requirements

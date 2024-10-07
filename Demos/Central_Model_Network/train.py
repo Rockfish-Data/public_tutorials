@@ -19,7 +19,7 @@ async def runtime():
 
     # stream datasets to model
     # data files location https://drive.google.com/drive/folders/1PqESQgLIrz-ztBc9UoH5kZpqIwu9GFyd?usp=sharing
-    dirpath = Path("location3_hours")
+    dirpath = Path("datafiles/location3_hours")
     dataset_paths = sorted([
         file.name for file in dirpath.glob('location3_*.csv')
         if not file.name.endswith('_timestamp.csv')
@@ -29,7 +29,7 @@ async def runtime():
     # dataset_paths = dataset_paths[start_idx:end_idx]
 
     for i, path in enumerate(dataset_paths):
-        dataset = rf.Dataset.from_csv("train", f"location3_hours/{path}")
+        dataset = rf.Dataset.from_csv("train", f"datafiles/location3_hours/{path}")
         await runtime_workflow.write_datastream(datastream, dataset)
         time.sleep(10)
         print(f"Training model {i} on {path}")
