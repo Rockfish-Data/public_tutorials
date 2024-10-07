@@ -29,7 +29,7 @@ async def get_synthetic_data(generate_conf):
         generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
 
         model = await conn.list_models(
-            labels={"kind": model_label, "workflow_id": "2VwGO12StbIHtb3opDhRdq"}
+            labels={"kind": model_label, "workflow_id": "1fREzIDmFHOBubmnRQv9Nw"}
         ).last()
 
         builder = rf.WorkflowBuilder()
@@ -49,6 +49,8 @@ async def get_synthetic_data(generate_conf):
         # add timestamps to syn data
         syn_dataset = syn_dataset.append_column("timestamp", [timestamps])
         syn_datasets.append(syn_dataset)
+
+    conn.session.close()
 
     return pa.concat_tables(syn_datasets)
 
@@ -122,8 +124,8 @@ async def generate():
         file.name for file in dirpath.glob('location3_*.csv')
         if not file.name.endswith('_timestamp.csv')
     ])
-    start_idx = 30
-    end_idx = 60
+    start_idx = 0
+    end_idx = 1
     dataset_paths = dataset_paths[start_idx:end_idx]
 
     generate_conf = {}
@@ -132,7 +134,7 @@ async def generate():
             "model": f"model_{path[10:-4]}"
         }
 
-    # syn_data = await get_synthetic_data(generate_conf)
+    syn_data = await get_synthetic_data(generate_conf)
     # syn_data.to_pandas().to_csv(f"loc3_syn_tabgan_{start_idx}.csv", index=False)
     #
     # exit(0)
@@ -141,7 +143,7 @@ async def generate():
     loc2_data = pd.read_csv("datafiles/location2.csv")
     loc3_syn_data = pd.read_csv("datafiles/new_syn.csv")
     loc3_real_data = pd.read_csv("datafiles/location3.csv")
-    loc3_hack_data = pd.read_csv('datafiles/competitive_syn_data.csv')
+    loc3_hack_data = pd.read_csv('datafiles/naive_syn_data.csv')
 
     model = "prophet"
 

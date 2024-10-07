@@ -19,7 +19,7 @@ def forecast_using_prophet(data, test, setup=None):
 
     # make predictions using learnt model
     forecast = model.predict(future)
-    forecast.to_csv(f"forecast_prophet_{setup}.csv")
+    forecast.to_csv(f"datafiles/downstream model files/forecast_prophet_{setup}.csv")
 
     return forecast
 
