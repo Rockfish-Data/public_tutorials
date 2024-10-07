@@ -5,11 +5,7 @@ from rockfish.labs.dataset_properties import DatasetPropertyExtractor
 from rockfish.labs.recommender import ModelType
 from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
-
-from rockfish.labs.vis import custom_plot
-from sqlalchemy.util import asyncio
-
-from Demos.Template.train import runtime
+import asyncio
 
 
 def get_dataset(dbrx_url, table_name):
