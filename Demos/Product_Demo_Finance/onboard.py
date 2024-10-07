@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import rockfish as rf
 import rockfish.labs as rl
 import rockfish.actions as ra
@@ -18,25 +19,32 @@ def get_dataset(dbrx_url, table_name):
 
 
 async def run_data_quality_checks(dataset, actions, fidelity_requirements):
-    conn = rf.Connection.from_config("prod")
-    builder = rf.WorkflowBuilder()
-    builder.add_path(dataset, *actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
-    workflow = await builder.start(conn)
-    syn = await (await workflow.datasets().last()).to_local(conn)
+    # conn = rf.Connection.from_config("prod")
+    # builder = rf.WorkflowBuilder()
+    # builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
+    # workflow = await builder.start(conn)
+    # print(f"Workflow ID: {workflow.id()}")
+    # syn = await (await workflow.datasets().last()).to_local(conn)
+    # syn.to_pandas().to_csv("transactions_2023-08-01_hour09_syn.csv", index=False)
+    syn = rf.Dataset.from_csv(
+        "transactions_2023-08-01_hour09_syn",
+        "transactions_2023-08-01_hour09_syn.csv"
+    )
 
-    plot_config = {
-        "SELECT count(fraud) AS fraud, category FROM my_table GROUP BY category": {
-            "custom_plot": rl.vis.plot_kde,
-            "field": "fraud"
-        }
-    }
-    for query in fidelity_requirements[0]:
-        rl.vis.custom_plot(
+    plot_configs = [
+        {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
+        {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
+        {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
+    ]
+    for query, plot_config in zip(fidelity_requirements, plot_configs):
+        sns = rl.vis.custom_plot(
             datasets=[dataset, syn],
             query=query,
-            plot_func=plot_config[query]["custom_plot"],
-            field=plot_config[query]["fraud"]
+            plot_func=plot_config["custom_plot"],
+            field=plot_config["field"],
         )
+        sns.fig.suptitle(query)
+        plt.show()
 
 
 
@@ -65,10 +73,12 @@ async def get_rf_recommended_workflow(
         remap_actions.append(remap)
 
     train_action = recommender_output.actions[0]
-    train_action.config().doppelganger.epoch = 50
-    train_action.config().doppelganger.epoch_checkpoint_freq = 50
+    train_action.config().doppelganger.batch_size = 512
+    train_action.config().doppelganger.epoch = 100
+    train_action.config().doppelganger.epoch_checkpoint_freq = 100
 
     print("\nUpdating Train Model Parameters as:")
+    print(f"batch_size: {train_action.config().doppelganger.batch_size}")
     print(f"epochs: {train_action.config().doppelganger.epoch}")
 
     runtime_conf = rf.WorkflowBuilder()
@@ -99,9 +109,9 @@ asyncio.run(
         metadata_fields = ["age", "email", "gender"],
         privacy_requirements = {"email": "mask"},
         fidelity_requirements = [
-            "SELECT count(fraud) AS fraud, category FROM my_table GROUP BY category",
-            "SELECT avg(amount) as amount, age, gender from my_table group by age, gender",
-            "SELECT avg(amount) as amount, merchant from my_table group by merchant"
+            "SELECT COUNT(fraud) AS fraud, category FROM my_table WHERE fraud = 1 GROUP BY category",
+            "SELECT COUNT(fraud) AS fraud, age, gender FROM my_table WHERE fraud = 1 GROUP BY age, gender",
+            "SELECT COUNT(fraud) AS fraud, merchant FROM my_table WHERE fraud = 1 GROUP BY merchant",
         ]
     )
 )
