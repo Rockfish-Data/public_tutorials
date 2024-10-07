@@ -3,12 +3,27 @@ import rockfish.actions as ra
 from rockfish.labs.dataset_properties import DatasetPropertyExtractor
 from rockfish.labs.recommender import ModelType
 from rockfish.labs.steps import ModelSelection, Recommender
+import rockfish.labs as rl
 import pickle
 
+async def compute_fidelity(dataset, recommender_output):
+    conn = rf.Connection.from_config()
+    builder = rf.WorkflowBuilder()
+    builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
+    workflow = await builder.start(conn)
 
-def get_rf_recommended_workflow(
-        filepath, session_key, metadata_fields,
-        privacy_requirements, fidelity_requirements
+    syn = await (await workflow.datasets().last()).to_local(conn)
+
+    # remove that warning
+    conn.session.close()
+
+    fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
+    return fidelity_score
+
+async def get_rf_recommended_workflow(
+        filepath, session_key=None, metadata_fields=None,
+        privacy_requirements=None, fidelity_requirements=None,
+        model_customizations=None
 ):
     dataset = rf.Dataset.from_csv("sample_data", filepath)
     dataset_properties = DatasetPropertyExtractor(
@@ -23,6 +38,20 @@ def get_rf_recommended_workflow(
     ).run()
 
     print(recommender_output.report)
+
+    # CUSTOMIZE MODEL
+    print('\nUpdating Train Model Parameters as:')
+    # update the model name for the config
+    config = recommender_output.actions[0].config()["tabular-gan"]
+    for k, v in model_customizations.items():
+        config[k] = v
+        print(f'{k}: {v}')
+
+    # utilise the fidelity_requirements to evaluate the synthetic data
+    print('\nEvaluating Synthetic Data Quality:')
+    fidelity_score = await compute_fidelity(dataset, recommender_output)
+    print(f'Fidelity Score: {fidelity_score:.4f}')
+
 
     remap_actions = []
     for col_to_mask in privacy_requirements["mask"]:
