@@ -35,13 +35,12 @@ async def runtime():
         print(f"Training model {i} on {path}")
 
     # add labels
-    # TODO: share location3 models with central
-    # for i, path in enumerate(dataset_paths):
-    #     model = await runtime_workflow.models().nth(i)
-    #     label = path[10:-4]
-    #     await model.add_labels(conn, kind=f"model_{label}")
-    #     print(model)
-    #     print(f"Finished training model {i} on {path}")
+    for i, path in enumerate(dataset_paths):
+        model = await runtime_workflow.models().nth(i)
+        label = path[10:-4]
+        await model.add_labels(conn, kind=f"model_{label}")
+        print(model)
+        print(f"Finished training model {i} on {path}")
 
     conn.session.close()
 

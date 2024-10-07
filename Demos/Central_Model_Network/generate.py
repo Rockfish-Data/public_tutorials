@@ -29,7 +29,7 @@ async def get_synthetic_data(generate_conf):
         generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
 
         model = await conn.list_models(
-            labels={"kind": model_label, "workflow_id": "1fREzIDmFHOBubmnRQv9Nw"}
+            labels={"kind": model_label, "workflow_id": "2mip7k5Q5icO2ztOzg5Vkt"}
         ).last()
 
         builder = rf.WorkflowBuilder()
