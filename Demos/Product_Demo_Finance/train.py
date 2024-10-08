@@ -24,42 +24,25 @@ async def runtime():
     runtime_workflow = await runtime_conf.start(conn)
     print(f'Runtime ID [for debugging now, not shown in demo]: {runtime_workflow.id()}')
 
-    # stream datasets to model on normal transactions
+    # stream datasets to model
     dataset_names = [
-        "normal_transactions_day1",
-        "normal_transactions_day2",
+        "transactions_2023-08-01_hour09",
+        "transactions_2023-08-01_hour10",
+        "transactions_2023-08-01_hour11"
     ]
     for i, name in enumerate(dataset_names):
-        dataset = get_dataset(
-            dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
-            table_name=name
-        )
+        # dataset = get_dataset(
+        #     dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
+        #     table_name=name
+        # )
+        dataset = rf.Dataset.from_csv(name, f"{name}.csv")
         await runtime_workflow.write_datastream(datastream, dataset)
-        print(f"Training model {i} on {name}")
+        print(f"Training model {i} on table: {name}")
 
     # optional: add labels
-    for i, path in enumerate(dataset_names):
-        model = await runtime_workflow.models().nth(i)
-        await model.add_labels(conn, kind=path)
-        print(f"Finished training model {i} on {path}")
-
-    # stream datasets to model on abnormal transactions
-    dataset_names = [
-        "abnormal_transactions_day1",
-        "abnormal_transactions_day2",
-    ]
     for i, name in enumerate(dataset_names):
-        dataset = get_dataset(
-            dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
-            table_name=name
-        )
-        await runtime_workflow.write_datastream(datastream, dataset)
-        print(f"Training model {i} on {name}")
-
-    # optional: add labels
-    for i, path in enumerate(dataset_names):
         model = await runtime_workflow.models().nth(i)
-        await model.add_labels(conn, kind=path)
-        print(f"Finished training model {i} on {path}")
+        await model.add_labels(conn, kind=name)
+        print(f"Finished training model {i} on {name}")
 
 asyncio.run(runtime())
