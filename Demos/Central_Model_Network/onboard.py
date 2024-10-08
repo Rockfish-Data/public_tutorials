@@ -6,18 +6,32 @@ import rockfish.labs as rl
 from rockfish.labs.dataset_properties import DatasetPropertyExtractor, DatasetType
 from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
+import matplotlib.pyplot as plt
 
 
 async def compute_fidelity(dataset, recommender_output):
-    conn = rf.Connection.from_config()
-    builder = rf.WorkflowBuilder()
-    builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
-    workflow = await builder.start(conn)
+    # conn = rf.Connection.from_config()
+    # builder = rf.WorkflowBuilder()
+    # builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
+    # workflow = await builder.start(conn)
+    #
+    # syn = await (await workflow.datasets().last()).to_local(conn)
+    #
+    # fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
+    # return fidelity_score
 
-    syn = await (await workflow.datasets().last()).to_local(conn)
+    feature = "feature_9"
 
-    fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
-    return fidelity_score
+    source_data = rf.Dataset.from_csv("Ideal",
+                                      "datafiles/location3_hours/location3_2023-08-06_hour01.csv")
+    syn_filepath = "datafiles/hourly syn data/location3_2023-08-06_hour01.csv"
+    syn_data = rf.Dataset.from_csv("Rockfish", syn_filepath)
+    syn_naive_data = rf.Dataset.from_csv("Naive", "datafiles/naive_syn_data.csv")
+    syn_naive_data.table = syn_naive_data.table.slice(offset=1000, length=60)
+
+    sns = rl.vis.plot_kde([source_data, syn_naive_data, syn_data], feature, palette=['g', 'orange', 'b'])
+    sns.set_xlabels("Normalized Feature9")
+    plt.show()
 
 
 async def get_rf_recommended_workflow(
@@ -45,9 +59,10 @@ async def get_rf_recommended_workflow(
         config[k] = v
         print(f'{k}: {v}')
 
-    print('\nEvaluating Synthetic Data Quality:')
-    fidelity_score = await compute_fidelity(dataset, recommender_output)
-    print(f'Fidelity Score: {fidelity_score:.4f}')
+    # print('\nEvaluating Synthetic Data Quality:')
+    # fidelity_score = await compute_fidelity(dataset, recommender_output)
+    # print(f'Fidelity Score: {fidelity_score:.4f}')
+    await compute_fidelity(dataset, recommender_output)
 
     # SAVE RUNNING WORKFLOW BUILDER (with preprocess + train actions, because this won't change per model)
     runtime_conf = rf.WorkflowBuilder()

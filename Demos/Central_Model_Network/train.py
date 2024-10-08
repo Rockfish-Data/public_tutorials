@@ -24,9 +24,9 @@ async def runtime():
         file.name for file in dirpath.glob('location3_*.csv')
         if not file.name.endswith('_timestamp.csv')
     ])
-    # start_idx = 30
-    # end_idx = 35
-    # dataset_paths = dataset_paths[start_idx:end_idx]
+    start_idx = 0
+    end_idx = 1
+    dataset_paths = dataset_paths[start_idx:end_idx]
 
     for i, path in enumerate(dataset_paths):
         dataset = rf.Dataset.from_csv("train", f"datafiles/location3_hours/{path}")
@@ -35,12 +35,13 @@ async def runtime():
         print(f"Training model {i} on {path}")
 
     # add labels
-    # TODO: share location3 models with central
-    # for i, path in enumerate(dataset_paths):
-    #     model = await runtime_workflow.models().nth(i)
-    #     label = path[10:-4]
-    #     await model.add_labels(conn, kind=f"model_{label}")
-    #     print(model)
-    #     print(f"Finished training model {i} on {path}")
+    for i, path in enumerate(dataset_paths):
+        model = await runtime_workflow.models().nth(i)
+        label = path[10:-4]
+        await model.add_labels(conn, kind=f"model_{label}")
+        print(model)
+        print(f"Finished training model {i} on {path}")
+
+    await conn.session.close()
 
 asyncio.run(runtime())
