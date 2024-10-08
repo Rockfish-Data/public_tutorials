@@ -1,7 +1,12 @@
+from time import sleep
+
 import rockfish as rf
 import rockfish.actions as ra
 import asyncio
 import pickle
+
+from pyarrow.dataset import dataset
+
 
 def get_dataset(dbrx_url, table_name):
     return ra.DatabricksSqlLoad(
@@ -26,15 +31,18 @@ async def runtime():
 
     # stream datasets to model on normal transactions
     dataset_names = [
-        "normal_transactions_day1",
-        "normal_transactions_day2",
+        "transactions_2023-08-01_hour09.csv",
+        "transactions_2023-08-01_hour10.csv",
     ]
     for i, name in enumerate(dataset_names):
-        dataset = get_dataset(
-            dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
-            table_name=name
-        )
+        # dataset = get_dataset(
+        #     dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
+        #     table_name=name
+        # )
+        dataset = rf.Dataset.from_csv(name, name)
+        sleep(3)
         await runtime_workflow.write_datastream(datastream, dataset)
+        sleep(3)
         print(f"Training model {i} on {name}")
 
     # optional: add labels

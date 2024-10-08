@@ -42,6 +42,6 @@ async def runtime():
         print(model)
         print(f"Finished training model {i} on {path}")
 
-    conn.session.close()
+    await conn.session.close()
 
 asyncio.run(runtime())

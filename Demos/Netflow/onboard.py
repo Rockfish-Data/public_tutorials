@@ -15,7 +15,7 @@ async def compute_fidelity(dataset, recommender_output):
     syn = await (await workflow.datasets().last()).to_local(conn)
 
     # remove that warning
-    conn.session.close()
+    await conn.session.close()
 
     fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
     return fidelity_score
