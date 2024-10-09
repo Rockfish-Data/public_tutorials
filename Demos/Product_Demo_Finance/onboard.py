@@ -20,9 +20,9 @@ def get_dataset(dbrx_url, table_name):
 
 def data_quality_check(dataset, syn, fidelity_requirements):
     plot_configs = [
-        {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
-        {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
-        {"custom_plot": rl.vis.plot_kde, "field": "fraud"},
+        {"custom_plot": rl.vis.plot_kde, "field": "fraud", "title": "Distribution of fraud per category"},
+        {"custom_plot": rl.vis.plot_kde, "field": "fraud", "title": "Distribution of fraud over customer age and gender"},
+        {"custom_plot": rl.vis.plot_kde, "field": "fraud", "title": "Distribution of fraud per merchant"},
     ]
     for query, plot_config in zip(fidelity_requirements, plot_configs):
         sns = rl.vis.custom_plot(
@@ -31,8 +31,9 @@ def data_quality_check(dataset, syn, fidelity_requirements):
             plot_func=plot_config["custom_plot"],
             field=plot_config["field"],
         )
-        sns.fig.suptitle(query)
-        plt.show()
+        sns.ax.set_title(plot_config["title"])
+        sns.fig.tight_layout()
+        plt.savefig(f"{plot_config['title']}.png", dpi=500)
 
 
 async def get_rf_recommended_workflow(
@@ -78,7 +79,7 @@ async def get_rf_recommended_workflow(
 
     if run_workflow:
         actions = [*list(runtime_conf.actions.values())[1:], recommender_output.actions[-1]]
-        conn = rf.Connection.from_config("prod")
+        conn = rf.Connection.from_config()
         builder = rf.WorkflowBuilder()
         builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
         workflow = await builder.start(conn)
@@ -92,7 +93,7 @@ async def get_rf_recommended_workflow(
 #     table_name="transactions_week1"
 # )
 
-sample_data = rf.Dataset.from_csv("transactions_2023-08-01_hour09", "transactions_2023-08-01_hour09.csv")
+sample_data = rf.Dataset.from_csv("Real", "transactions_2023-08-01_hours09to11.csv")
 fidelity_requirements = [
     "SELECT COUNT(fraud) AS fraud, category FROM my_table WHERE fraud = 1 GROUP BY category",
     "SELECT COUNT(fraud) AS fraud, age, gender FROM my_table WHERE fraud = 1 GROUP BY age, gender",
@@ -105,13 +106,13 @@ asyncio.run(
         session_key="customer",
         metadata_fields = ["age", "email", "gender"],
         privacy_requirements = {"email": "mask"},
-        fidelity_requirements = fidelity_requirements
+        fidelity_requirements = fidelity_requirements,
+        # run_workflow=True  # run the onboarding workflow to create syn data
     )
 )
 
-# run the onboarding workflow to create syn data
 syn = rf.Dataset.from_csv(
-    "transactions_2023-08-01_hour09_syn",
+    "Rockfish",
     "transactions_2023-08-01_hour09_syn.csv"
 )
 data_quality_check(sample_data, syn, fidelity_requirements)
