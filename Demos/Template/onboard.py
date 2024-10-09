@@ -5,27 +5,31 @@ from rockfish.labs.recommender import ModelType
 from rockfish.labs.steps import ModelSelection, Recommender
 import rockfish.labs as rl
 import pickle
+import asyncio
+import matplotlib.pyplot as plt
 
-async def compute_fidelity(dataset, recommender_output):
-    conn = rf.Connection.from_config()
-    builder = rf.WorkflowBuilder()
-    builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
-    workflow = await builder.start(conn)
 
-    syn = await (await workflow.datasets().last()).to_local(conn)
+def data_quality_check(dataset, syn, fidelity_requirements):
+    plot_configs = [
+        {"custom_plot": rl.vis.plot_kde, "field": "<FIELD_NAME>", "title": "<PLOT_TITLE>"},
+    ]
+    for query, plot_config in zip(fidelity_requirements, plot_configs):
+        sns = rl.vis.custom_plot(
+            datasets=[dataset, syn],
+            query=query,
+            plot_func=plot_config["custom_plot"],
+            field=plot_config["field"],
+        )
+        sns.ax.set_title(plot_config["title"])
+        sns.fig.tight_layout()
+        plt.savefig(f"{plot_config['title']}.png", dpi=500)
 
-    # remove that warning
-    await conn.session.close()
-
-    fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
-    return fidelity_score
 
 async def get_rf_recommended_workflow(
-        filepath, session_key=None, metadata_fields=None,
+        dataset, session_key=None, metadata_fields=None,
         privacy_requirements=None, fidelity_requirements=None,
-        model_customizations=None
+        run_workflow=False
 ):
-    dataset = rf.Dataset.from_csv("sample_data", filepath)
     dataset_properties = DatasetPropertyExtractor(
         dataset=dataset,
         session_key=session_key,
@@ -39,45 +43,48 @@ async def get_rf_recommended_workflow(
 
     print(recommender_output.report)
 
-    # CUSTOMIZE MODEL
-    print('\nUpdating Train Model Parameters as:')
-    # update the model name for the config
-    config = recommender_output.actions[0].config()["tabular-gan"]
-    for k, v in model_customizations.items():
-        config[k] = v
-        print(f'{k}: {v}')
+    # IF NEED TO CUSTOMIZE MODEL HYPERPARAMS, ADD HERE
+    # print('Updating Train Model Parameters as:')
 
-    # utilise the fidelity_requirements to evaluate the synthetic data
-    print('\nEvaluating Synthetic Data Quality:')
-    fidelity_score = await compute_fidelity(dataset, recommender_output)
-    print(f'Fidelity Score: {fidelity_score:.4f}')
-
-
-    remap_actions = []
-    for col_to_mask in privacy_requirements["mask"]:
-        remap = ra.Transform(
-            {"function": {"remap": ["fixed_mask", col_to_mask, {"mask_length": 8, "from_end": False}]}}
-        )
-        remap_actions.append(remap)
+    # IF PRIVACY REQUIREMENTS EXIST, ADD REMAP ACTIONS
+    # remap_actions = []
 
     # SAVE RUNNING WORKFLOW BUILDER (with preprocess + train actions, because this won't change per model)
     runtime_conf = rf.WorkflowBuilder()
-    runtime_conf.add_path(ra.DatastreamLoad(), *remap_actions, *recommender_output.actions[:-1])
+    runtime_conf.add_path(ra.DatastreamLoad(), *recommender_output.actions[:-1])
     pickle.dump(runtime_conf, open('runtime_conf.pkl', 'wb'))
 
     # JUST SAVE GEN ACTION (because you need to add a model as a source, and this changes per generate task)
     pickle.dump(recommender_output.actions[-1], open('generate_conf.pkl', 'wb'))
 
+    if run_workflow:
+        actions = [*list(runtime_conf.actions.values())[1:], recommender_output.actions[-1]]
+        conn = rf.Connection.from_config()
+        builder = rf.WorkflowBuilder()
+        builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
+        workflow = await builder.start(conn)
+        print(f"Workflow ID: {workflow.id()}")
+        syn_data = await (await workflow.datasets().last()).to_local(conn)
+        syn_data.to_pandas().to_csv(f"{dataset.name}_syn.csv", index=False)
     return runtime_conf
 
-sample_data_filepath = "test.csv"
+
+sample_data = rf.Dataset.from_csv("Real", "test.csv")
+fidelity_requirements = []
 
 # ONLY CHANGE THIS PER DEMO USE CASE
 # e.g. for AI model training, no need for privacy_requirements
-runtime_conf = get_rf_recommended_workflow(
-    filepath=sample_data_filepath,
+asyncio.run(get_rf_recommended_workflow(
+    dataset=sample_data,
     session_key="customer",
-    metadata_fields = ["age", "email", "gender"],
-    privacy_requirements = {"mask": ["email"]},
-    fidelity_requirements = {}
+    metadata_fields=["age", "email", "gender"],
+    privacy_requirements={"email": "mask"},
+    fidelity_requirements=fidelity_requirements,  # add SQL queries according to dataset
+    # run_workflow=True  # run the onboarding workflow to create syn data
+))
+
+syn = rf.Dataset.from_csv(
+    "Rockfish",
+    "<PATH>"
 )
+data_quality_check(sample_data, syn, fidelity_requirements)
