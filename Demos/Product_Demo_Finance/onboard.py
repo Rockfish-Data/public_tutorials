@@ -1,12 +1,13 @@
 import matplotlib.pyplot as plt
+import pandas as pd
 import rockfish as rf
-import rockfish.labs as rl
 import rockfish.actions as ra
 from rockfish.labs.dataset_properties import DatasetPropertyExtractor
 from rockfish.labs.recommender import ModelType
 from rockfish.labs.steps import ModelSelection, Recommender
 import pickle
 import asyncio
+import seaborn as sns
 
 
 def get_dataset(dbrx_url, table_name):
@@ -18,22 +19,51 @@ def get_dataset(dbrx_url, table_name):
     )
 
 
+def plot_bar(dataset, syn, plot_config):
+    d = dataset.to_pandas()
+    s = syn.to_pandas()
+
+    # get x from dataset and syn
+    for df in [d, s]:
+        for col in plot_config["x"]:
+            df[col] = df[col].astype(str)
+    x_col = d[plot_config["x"]].agg(''.join, axis=1).to_list()
+    x_col.extend(s[plot_config["x"]].agg(''.join, axis=1).to_list())
+
+    # get y from dataset and syn
+    y_col = d[plot_config["y"]].to_list()
+    y_col.extend(s[plot_config["y"]].to_list())
+
+    # create hue col
+    hue_col = [f"{dataset.name()}"] * dataset.table.num_rows + [f"{syn.name()}"] * syn.table.num_rows
+
+    x_col_name = ",".join(plot_config["x"])
+    y_col_name = plot_config["y"]
+    hue_col_name = "Dataset"
+    df = pd.DataFrame({
+        x_col_name: x_col,
+        y_col_name: y_col,
+        hue_col_name: hue_col
+    })
+
+    fig, ax = plt.subplots()
+    fig.set_figwidth(15)
+    sns.barplot(df, x=x_col_name, y=y_col_name, hue=hue_col_name)
+    fig.suptitle(plot_config["title"])
+    plt.xticks(rotation=45)
+    fig.tight_layout()
+    plt.savefig(f"{plot_config['title']}.png", dpi=500)
+
 def data_quality_check(dataset, syn, fidelity_requirements):
     plot_configs = [
-        {"custom_plot": rl.vis.plot_kde, "field": "fraud", "title": "Distribution of fraud per category"},
-        {"custom_plot": rl.vis.plot_kde, "field": "fraud", "title": "Distribution of fraud over customer age and gender"},
-        {"custom_plot": rl.vis.plot_kde, "field": "fraud", "title": "Distribution of fraud per merchant"},
+        {"custom_plot": None, "x": ["category"], "y": "fraud", "title": "Distribution of fraud per category"},
+        {"custom_plot": None, "x": ["age", "gender"], "y": "fraud", "title": "Distribution of fraud over customer age and gender"},
+        {"custom_plot": None, "x": ["merchant"], "y": "fraud", "title": "Distribution of fraud per merchant"},
     ]
     for query, plot_config in zip(fidelity_requirements, plot_configs):
-        sns = rl.vis.custom_plot(
-            datasets=[dataset, syn],
-            query=query,
-            plot_func=plot_config["custom_plot"],
-            field=plot_config["field"],
-        )
-        sns.ax.set_title(plot_config["title"])
-        sns.fig.tight_layout()
-        plt.savefig(f"{plot_config['title']}.png", dpi=500)
+        d = dataset.sync_sql(query)
+        s = syn.sync_sql(query)
+        plot_bar(dataset=d, syn=s, plot_config=plot_config)
 
 
 async def get_rf_recommended_workflow(
@@ -81,11 +111,11 @@ async def get_rf_recommended_workflow(
         actions = [*list(runtime_conf.actions.values())[1:], recommender_output.actions[-1]]
         conn = rf.Connection.from_config()
         builder = rf.WorkflowBuilder()
-        builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
+        builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name()}_syn"))
         workflow = await builder.start(conn)
         print(f"Workflow ID: {workflow.id()}")
         syn_data = await (await workflow.datasets().last()).to_local(conn)
-        syn_data.to_pandas().to_csv(f"{dataset.name}_syn.csv", index=False)
+        syn_data.to_pandas().to_csv(f"{dataset.name()}_syn.csv", index=False)
     return runtime_conf
 
 # sample_data = get_dataset(
@@ -93,7 +123,7 @@ async def get_rf_recommended_workflow(
 #     table_name="transactions_week1"
 # )
 
-sample_data = rf.Dataset.from_csv("Real", "transactions_2023-08-01_hours09to11.csv")
+sample_data = rf.Dataset.from_csv("Real", "transactions_2023-08-01_hour09.csv")
 fidelity_requirements = [
     "SELECT COUNT(fraud) AS fraud, category FROM my_table WHERE fraud = 1 GROUP BY category",
     "SELECT COUNT(fraud) AS fraud, age, gender FROM my_table WHERE fraud = 1 GROUP BY age, gender",

@@ -61,11 +61,11 @@ async def get_rf_recommended_workflow(
         actions = [*list(runtime_conf.actions.values())[1:], recommender_output.actions[-1]]
         conn = rf.Connection.from_config()
         builder = rf.WorkflowBuilder()
-        builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name}_syn"))
+        builder.add_path(dataset, *actions, ra.DatasetSave(name=f"{dataset.name()}"))
         workflow = await builder.start(conn)
         print(f"Workflow ID: {workflow.id()}")
         syn_data = await (await workflow.datasets().last()).to_local(conn)
-        syn_data.to_pandas().to_csv(f"{dataset.name}_syn.csv", index=False)
+        syn_data.to_pandas().to_csv(f"{dataset.name()}_syn.csv", index=False)
     return runtime_conf
 
 
