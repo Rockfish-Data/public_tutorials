@@ -62,7 +62,7 @@ def plot_bar(dataset, syn, plot_config):
     fig.suptitle(plot_config["title"])
     plt.xticks(rotation=45)
     fig.tight_layout()
-    plt.savefig(f"{plot_config['title']}_runtime.png", dpi=500)
+    plt.savefig(f"{plot_config['title']}.png", dpi=500)
 
 def data_quality_check(dataset, syn, fidelity_requirements):
     plot_configs = [
@@ -133,7 +133,7 @@ async def get_rf_recommended_workflow(
 #     table_name="transactions_week1"
 # )
 
-sample_data = rf.Dataset.from_csv("Real", "transactions_2023-08-01_hours09to11.csv")
+sample_data = rf.Dataset.from_csv("Real", "transactions_2023-08-01_hour09.csv")
 fidelity_requirements = [
     "SELECT fraud, COUNT(fraud) AS fraud_count FROM my_table GROUP BY fraud",
     "SELECT (SUM(amount) * 100)/SUM(SUM(amount)) OVER () as amount_perc, age, gender FROM my_table GROUP BY age, gender",
@@ -152,6 +152,6 @@ asyncio.run(
 
 syn = rf.Dataset.from_csv(
     "Rockfish",
-    "transactions_2023-08-01_hours09to11_syn.csv"
+    "transactions_2023-08-01_hour09_syn.csv"
 )
 data_quality_check(sample_data, syn, fidelity_requirements)
