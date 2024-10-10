@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import rockfish as rf
@@ -23,22 +25,30 @@ def plot_bar(dataset, syn, plot_config):
     d = dataset.to_pandas()
     s = syn.to_pandas()
 
+    x_col_name = ",".join(plot_config["x"])
+    y_col_name = plot_config["y"]
+
     # get x from dataset and syn
     for df in [d, s]:
         for col in plot_config["x"]:
             df[col] = df[col].astype(str)
-    x_col = d[plot_config["x"]].agg(''.join, axis=1).to_list()
-    x_col.extend(s[plot_config["x"]].agg(''.join, axis=1).to_list())
+        df[x_col_name] = df[plot_config["x"]].agg(''.join, axis=1)
+
+    # compare only those categories (top k = 7) that exist in real
+    d = d.sort_values(by=y_col_name, ascending=False)
+    d = d.loc[d[x_col_name].isin(d[x_col_name][:7])]
+    s = s.loc[s[x_col_name].isin(d[x_col_name])]
+
+    x_col = d[x_col_name].to_list()
+    x_col.extend(s[x_col_name].to_list())
 
     # get y from dataset and syn
     y_col = d[plot_config["y"]].to_list()
     y_col.extend(s[plot_config["y"]].to_list())
 
     # create hue col
-    hue_col = [f"{dataset.name()}"] * dataset.table.num_rows + [f"{syn.name()}"] * syn.table.num_rows
+    hue_col = [f"{dataset.name()}"] * len(d) + [f"{syn.name()}"] * len(s)
 
-    x_col_name = ",".join(plot_config["x"])
-    y_col_name = plot_config["y"]
     hue_col_name = "Dataset"
     df = pd.DataFrame({
         x_col_name: x_col,
@@ -47,7 +57,7 @@ def plot_bar(dataset, syn, plot_config):
     })
 
     fig, ax = plt.subplots()
-    fig.set_figwidth(15)
+    fig.set_figwidth(plot_config["figwidth"])
     sns.barplot(df, x=x_col_name, y=y_col_name, hue=hue_col_name)
     fig.suptitle(plot_config["title"])
     plt.xticks(rotation=45)
@@ -56,11 +66,11 @@ def plot_bar(dataset, syn, plot_config):
 
 def data_quality_check(dataset, syn, fidelity_requirements):
     plot_configs = [
-        {"custom_plot": None, "x": ["category"], "y": "fraud", "title": "Distribution of fraud per category"},
-        {"custom_plot": None, "x": ["age", "gender"], "y": "fraud", "title": "Distribution of fraud over customer age and gender"},
-        {"custom_plot": None, "x": ["merchant"], "y": "fraud", "title": "Distribution of fraud per merchant"},
+        {"custom_plot": None, "x": ["fraud"], "y": "fraud_count", "title": "Distribution of transaction type", "figwidth": 5},
+        {"custom_plot": None, "x": ["age", "gender"], "y": "amount_perc", "title": "Percentage of amount per customer age, gender", "figwidth": 10},
     ]
     for query, plot_config in zip(fidelity_requirements, plot_configs):
+        print(f"Performing check for: {query}")
         d = dataset.sync_sql(query)
         s = syn.sync_sql(query)
         plot_bar(dataset=d, syn=s, plot_config=plot_config)
@@ -125,9 +135,8 @@ async def get_rf_recommended_workflow(
 
 sample_data = rf.Dataset.from_csv("Real", "transactions_2023-08-01_hour09.csv")
 fidelity_requirements = [
-    "SELECT COUNT(fraud) AS fraud, category FROM my_table WHERE fraud = 1 GROUP BY category",
-    "SELECT COUNT(fraud) AS fraud, age, gender FROM my_table WHERE fraud = 1 GROUP BY age, gender",
-    "SELECT COUNT(fraud) AS fraud, merchant FROM my_table WHERE fraud = 1 GROUP BY merchant",
+    "SELECT fraud, COUNT(fraud) AS fraud_count FROM my_table GROUP BY fraud",
+    "SELECT (SUM(amount) * 100)/SUM(SUM(amount)) OVER () as amount_perc, age, gender FROM my_table GROUP BY age, gender",
 ]
 
 asyncio.run(
