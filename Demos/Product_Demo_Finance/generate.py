@@ -24,14 +24,14 @@ async def get_synthetic_data(generate_conf):
         syn_datasets = []
         for source, params in generate_conf.items():
             model_label = params["model"]
-            print(f"Generating from {model_label}")
+            print(f"Generating from {model_label} with params {params}")
 
             model = await conn.list_models(
                 labels={"kind": model_label, "workflow_id": "1nBIPGpZ1pLOmbB0YehK7s"}
             ).last()
 
             generate_action = pickle.load(open("generate_conf.pkl", "rb"))
-            session_target = ra.SessionTarget(target=params["sessions"], max_cycles=100)
+            session_target = ra.SessionTarget(target=params["sessions"], max_cycles=1000)
             save = ra.DatasetSave(name="synthetic", concat_tables=True, concat_session_key="session_key")
 
             builder = rf.WorkflowBuilder()
@@ -55,7 +55,10 @@ async def get_synthetic_data(generate_conf):
                 builder.add_action(save, parents=[generate_action])
 
             workflow = await builder.start(conn)
-            syn_datasets.append((await workflow.datasets().concat(conn)).table)
+
+            syn = (await workflow.datasets().concat(conn))
+            syn.to_pandas().to_csv(f"{model_label[6:]}_syn.csv", index=False)
+            syn_datasets.append(syn.table)
             print(f"Finished generating {params['sessions']} sessions from model {model_label}")
 
         return pa.concat_tables(syn_datasets)
