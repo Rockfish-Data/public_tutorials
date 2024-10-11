@@ -125,9 +125,10 @@ async def generate():
         file.name for file in dirpath.glob('location3_*.csv')
         if not file.name.endswith('_timestamp.csv')
     ])
-    start_idx = 0
-    end_idx = 1
-    dataset_paths = dataset_paths[start_idx:end_idx]
+    # uncomment if specific models need to be used during generation
+    # start_idx = 0
+    # end_idx = 1
+    # dataset_paths = dataset_paths[start_idx:end_idx]
 
     generate_conf = {}
     for i, path in enumerate(dataset_paths):

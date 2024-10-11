@@ -19,56 +19,70 @@ def upload_data(dataset, dbrx_url, table_name):
         print(f"Upload failed: {response.text}")
 
 
-async def get_synthetic_data(model_to_gen_conf):
-    # connect to Rockfish platform
-    conn = rf.Connection.from_config()
+async def get_synthetic_data(generate_conf):
+    async with rf.Connection.from_config() as conn:  # connect to Rockfish platform
+        syn_datasets = []
+        for source, params in generate_conf.items():
+            model_label = params["model"]
+            print(f"Generating from {model_label}")
 
-    syn_datasets = []
-    for model_label, gen_params in model_to_gen_conf.items():
-        print(f"Generating from model {model_label} with params = {gen_params}")
-        generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
+            model = await conn.list_models(
+                labels={"kind": model_label, "workflow_id": "1nBIPGpZ1pLOmbB0YehK7s"}
+            ).last()
 
-        model = await conn.list_models(
-            labels={"kind": model_label, "workflow_id": "75DPfO3rlchVoA1bybrXFE"}
-        ).last()
+            generate_action = pickle.load(open("generate_conf.pkl", "rb"))
+            session_target = ra.SessionTarget(target=params["sessions"], max_cycles=100)
+            save = ra.DatasetSave(name="synthetic", concat_tables=True, concat_session_key="session_key")
 
-        generate_conf.config().doppelganger.sessions = gen_params["sessions"]
+            builder = rf.WorkflowBuilder()
 
-        builder = rf.WorkflowBuilder()
-        builder.add_path(
-            model,
-            generate_conf,
-            ra.DatasetSave(name="synthetic", concat_tables=True, concat_session_key="session_key")
-        )
-        workflow = await builder.start(conn)
-        syn_datasets.append((await workflow.datasets().concat(conn)).table)
-        print(f"Finished generating {gen_params['sessions']} sessions from model {model_label}")
+            builder.add_model(model)
+            builder.add_action(generate_action, parents=[model, session_target])
 
-    await conn.close()
+            if "conditions" in params:
+                post_amplify = ra.PostAmplify({
+                    "query_ast": {
+                        "and": [{"eq": ["fraud", 1]}, {"eq": ["category", "transportation"]}],
+                    },
+                    "drop_match_percentage": 0.0,
+                    "drop_other_percentage": 0.95,
+                })
+                builder.add_action(post_amplify, parents=[generate_action])
+                builder.add_action(session_target, parents=[post_amplify])
+                builder.add_action(save, parents=[post_amplify])
+            else:
+                builder.add_action(session_target, parents=[generate_action])
+                builder.add_action(save, parents=[generate_action])
 
-    return pa.concat_tables(syn_datasets)
+            workflow = await builder.start(conn)
+            syn_datasets.append((await workflow.datasets().concat(conn)).table)
+            print(f"Finished generating {params['sessions']} sessions from model {model_label}")
+
+        return pa.concat_tables(syn_datasets)
 
 async def generate():
     generate_conf = {
         "source1": {
             "start_time": "2023-08-08 09:00:00",
             "end_time": "2023-08-08 18:00:00",
-            "model": "model_normal_transactions",
-            "sessions": 1500,
+            "model": "model_transactions_2023-08-01_hour09",
+            "sessions": 10000,
         },
         "source2": {
             "start_time": "2023-08-08 12:30:00",
             "end_time": "2023-08-08 14:30:00",
-            "model": "model_abnormal_transactions",
-            "sessions": 500,
+            "model": "model_transactions_2023-08-01_hour11",
+            "conditions": {"category": ["transportation"]},
+            "sessions": 1500,
         },
     }
     syn_data = await get_synthetic_data(generate_conf)
+    syn_data.to_pandas().to_csv(f"story.csv", index=False)
 
-    upload_data(
-        dataset=syn_data,
-        dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
-        table_name="demo_transactions"
-    )
+    # upload_data(
+    #     dataset=syn_data,
+    #     dbrx_url="dbc-224b2644-c532.cloud.databricks.com/sql/1.0/warehouses/bbdd6ab06ef5dc44/",
+    #     table_name="demo_transactions"
+    # )
 
 asyncio.run(generate())

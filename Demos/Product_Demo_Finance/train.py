@@ -47,7 +47,7 @@ async def runtime():
         # optional: add labels
         for i, name in enumerate(dataset_names):
             model = await runtime_workflow.models().nth(i)
-            await model.add_labels(conn, kind=name)
+            await model.add_labels(conn, kind=f"model_{name}")
             print(f"Finished training model {i} on {name}")
 
 asyncio.run(runtime())

@@ -12,14 +12,15 @@ async def get_synthetic_data(generate_conf):
     for source, params in generate_conf.items():
         model_label = params["model"]
         print(f"Generating from {model_label}")
-        generate_conf = pickle.load(open("generate_conf.pkl", "rb"))
 
         # USUALLY IN THE DEMO WE WOULD SHOW GENERATION LIVE, SO PUT A WORKFLOW_ID HERE WITH ALREADY TRAINED MODELS
         model = await conn.list_models(labels={"kind": model_label, "workflow_id": "3HnOxCXK5OO7MpHEzYRee5"}).last()
         print(model)
 
+        generate_action = pickle.load(open("generate_conf.pkl", "rb"))
+
         builder = rf.WorkflowBuilder()
-        builder.add_path(model, generate_conf, ra.DatasetSave(name="synthetic"))
+        builder.add_path(model, generate_action, ra.DatasetSave(name="synthetic"))
         workflow = await builder.start(conn)
         syn_datasets.append((await workflow.datasets().concat(conn)).table)
 
