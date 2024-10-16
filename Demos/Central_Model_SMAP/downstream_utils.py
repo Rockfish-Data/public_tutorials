@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 import prophet
@@ -18,7 +20,10 @@ def forecast_using_prophet(data, test, setup=None):
 
     # make predictions using learnt model
     forecast = model.predict(future)
-    forecast.to_csv(f"datafiles/downstream model files/forecast_prophet_{setup}.csv")
+
+    # uncomment if you want to save the forecast results
+    # os.makedirs('datafiles/downstream model files', exist_ok=True)
+    # forecast.to_csv(f"datafiles/downstream model files/forecast_prophet_{setup}.csv")
 
     return forecast
 
