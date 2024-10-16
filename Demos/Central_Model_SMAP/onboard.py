@@ -12,6 +12,13 @@ import matplotlib.pyplot as plt
 async def compute_fidelity(dataset, recommender_output):
     # This is the code that will be responsible for the generation of a sample synthetic data, however, it is commented out to allow for exact reproducibility of the demo
 
+    """
+    Note:
+        The connection object employs the from_config method to connect to the Rockfish platform.
+        More on how to set this up for your system can be found at: https://docs142.rockfish.ai/sdk-overview.html#connection
+        Alternatively, you can use the following code to connect to the platform:
+        conn = rf.Connection.remote("https://api.rockfish.ai", "<API KEY>")
+    """
     # conn = rf.Connection.from_config()
     # builder = rf.WorkflowBuilder()
     # builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))

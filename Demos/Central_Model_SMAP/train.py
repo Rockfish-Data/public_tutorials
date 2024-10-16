@@ -6,6 +6,13 @@ from pathlib import Path
 
 
 async def runtime():
+    """
+    Note:
+        The connection object employs the from_config method to connect to the Rockfish platform.
+        More on how to set this up for your system can be found at: https://docs142.rockfish.ai/sdk-overview.html#connection
+        Alternatively, you can use the following code to connect to the platform:
+        conn = rf.Connection.remote("https://api.rockfish.ai", "<API KEY>")
+    """
     async with rf.Connection.from_config() as conn:  # connect to Rockfish platform
         # load runtime_conf (obtained after onboarding is complete)
         runtime_conf = pickle.load(open("runtime_conf.pkl", "rb"))

@@ -9,6 +9,13 @@ from downstream_utils import compare_models
 
 async def get_synthetic_data(generate_conf):
     # connect to Rockfish platform
+    """
+    Note:
+        The connection object employs the from_config method to connect to the Rockfish platform.
+        More on how to set this up for your system can be found at: https://docs142.rockfish.ai/sdk-overview.html#connection
+        Alternatively, you can use the following code to connect to the platform:
+        conn = rf.Connection.remote("https://api.rockfish.ai", "<API KEY>")
+    """
     conn = rf.Connection.from_config()
 
     syn_datasets = []
