@@ -23,7 +23,7 @@ async def compute_fidelity(dataset, recommender_output):
 
     source_data = rf.Dataset.from_csv("Ideal",
                                       "datafiles/location3_hours/location3_2023-08-06_hour01.csv")
-    syn_filepath = "datafiles/hourly syn data/location3_2023-08-06_hour01.csv"
+    syn_filepath = "datafiles/sample_syn.csv"
     syn_data = rf.Dataset.from_csv("Rockfish", syn_filepath)
 
     syn_naive_data = rf.Dataset.from_csv("Naive", "datafiles/naive_syn_data.csv")
