@@ -10,15 +10,14 @@ import matplotlib.pyplot as plt
 
 
 async def compute_fidelity(dataset, recommender_output):
+    # This is the code that will be responsible for the generation of a sample synthetic data, however, it is commented out to allow for exact reproducibility of the demo
+
     # conn = rf.Connection.from_config()
     # builder = rf.WorkflowBuilder()
     # builder.add_path(dataset, *recommender_output.actions, ra.DatasetSave(name='onboarding-fidelity-eval'))
     # workflow = await builder.start(conn)
     #
-    # syn = await (await workflow.datasets().last()).to_local(conn)
-    #
-    # fidelity_score = rl.metrics.marginal_dist_score(dataset, syn)
-    # return fidelity_score
+    # syn_data = await (await workflow.datasets().last()).to_local(conn)
 
     feature = "feature_9"
 
@@ -26,9 +25,11 @@ async def compute_fidelity(dataset, recommender_output):
                                       "datafiles/location3_hours/location3_2023-08-06_hour01.csv")
     syn_filepath = "datafiles/hourly syn data/location3_2023-08-06_hour01.csv"
     syn_data = rf.Dataset.from_csv("Rockfish", syn_filepath)
+
     syn_naive_data = rf.Dataset.from_csv("Naive", "datafiles/naive_syn_data.csv")
     syn_naive_data.table = syn_naive_data.table.slice(offset=1000, length=60)
 
+    # one of the many plotting options available in rockfish.labs
     sns = rl.vis.plot_kde([source_data, syn_naive_data, syn_data], feature, palette=['g', 'orange', 'b'])
     sns.set_xlabels("Normalized Feature9")
     plt.show()
@@ -59,9 +60,7 @@ async def get_rf_recommended_workflow(
         config[k] = v
         print(f'{k}: {v}')
 
-    # print('\nEvaluating Synthetic Data Quality:')
-    # fidelity_score = await compute_fidelity(dataset, recommender_output)
-    # print(f'Fidelity Score: {fidelity_score:.4f}')
+    print('\nEvaluating Synthetic Data Quality:')
     await compute_fidelity(dataset, recommender_output)
 
     # SAVE RUNNING WORKFLOW BUILDER (with preprocess + train actions, because this won't change per model)
@@ -74,7 +73,7 @@ async def get_rf_recommended_workflow(
     return runtime_conf
 
 
-sample_data_filepath = "datafiles/location3_hours/location3_2023-08-06_hour00.csv"
+sample_data_filepath = "datafiles/location3_hours/location3_2023-08-06_hour01.csv"
 
 # ONLY CHANGE THIS PER DEMO USE CASE
 # e.g. for AI model training, no need for privacy_requirements
