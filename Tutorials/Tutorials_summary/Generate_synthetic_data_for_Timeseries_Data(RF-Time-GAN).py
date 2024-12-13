@@ -7,13 +7,14 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.16.4
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: colab
+#     language: python
 #     name: python3
 # ---
 
 # %% id="64c0d8a8"
 # %%capture
-# %pip install -U 'rockfish[labs]' -f 'https://docs.rockfish.ai/packages/index.html'
+# %pip install -U 'rockfish[labs]' -f 'https://packages.rockfish.ai'
 
 # %% id="71b6977e"
 import rockfish as rf

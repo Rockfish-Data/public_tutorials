@@ -6,6 +6,10 @@
 #       format_name: percent
 #       format_version: '1.3'
 #       jupytext_version: 1.16.4
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
 # ---
 
 # %% [markdown]
@@ -14,7 +18,7 @@
 # %%
 # GENERATE SYNTHETIC DATASET USING ROCKFISH
 
-# %pip install -U 'rockfish[labs]' -f 'https://docs142.rockfish.ai/packages/index.html' 
+# %pip install -U 'rockfish[labs]' -f 'https://docs.rockfish.ai/packages/index.html' 
 # %restart_python
 
 # %% [markdown]
@@ -37,7 +41,7 @@ conn = rf.Connection.remote(api_url, api_key)
 import pandas as pd
 
 # Read a CSV file
-#df = pd.read_csv('<PATH_TO_SAMPLE_DATA_CSV>')
+df = pd.read_csv('<PATH_TO_SAMPLE_DATA_CSV>')
 
 # %% [markdown]
 # GENERATE SYNTHETIC DATA **Onboard Train and Generate** using **Rockfish GenAI** Models.
