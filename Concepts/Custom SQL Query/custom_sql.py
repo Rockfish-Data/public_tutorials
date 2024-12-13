@@ -14,7 +14,7 @@
 
 # %%
 # %%capture
-# %pip install -U 'rockfish[labs]' -f 'https://docs.rockfish.ai/packages/index.html'
+# %pip install -U 'rockfish[labs]' -f 'https://packages.rockfish.ai'
 
 # %%
 import rockfish as rf

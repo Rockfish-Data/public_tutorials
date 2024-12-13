@@ -32,7 +32,7 @@
 
 # %% id="GUWjYJW7Vspw"
 # %%capture
-# %pip install -U 'rockfish[labs]' -f 'https://docs.rockfish.ai/packages/index.html'
+# %pip install -U 'rockfish[labs]' -f 'https://packages.rockfish.ai'
 
 # %% id="I77DF8bPVx8j"
 import rockfish as rf

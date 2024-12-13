@@ -14,15 +14,17 @@
 
 # %% [markdown]
 # INSTALL ROCKFISH SDK
+#
 
 # %%
 # GENERATE SYNTHETIC DATASET USING ROCKFISH
 
-# %pip install -U 'rockfish[labs]' -f 'https://docs.rockfish.ai/packages/index.html' 
+# %pip install -U 'rockfish[labs]' -f 'https://packages.rockfish.ai'
 # %restart_python
 
 # %% [markdown]
 # SETUP ROCKFISH ENVIRONMENT VARIABLES
+#
 
 # %%
 # Rockfish Environment Key & API URL
@@ -36,24 +38,24 @@ conn = rf.Connection.remote(api_url, api_key)
 
 # %% [markdown]
 # Read Input Data into a dataframe.
+#
 
 # %%
 import pandas as pd
 
 # Read a CSV file
-df = pd.read_csv('<PATH_TO_SAMPLE_DATA_CSV>')
+df = pd.read_csv("<PATH_TO_SAMPLE_DATA_CSV>")
 
 # %% [markdown]
 # GENERATE SYNTHETIC DATA **Onboard Train and Generate** using **Rockfish GenAI** Models.
+#
 
 # %%
-#Onboard
+# Onboard
 # Perform any necessary feature engineering or preprocessing
-dataset = rf.Dataset.from_pandas("<NAME_OF_DATASET>",df)
+dataset = rf.Dataset.from_pandas("<NAME_OF_DATASET>", df)
 
-categorical_fields = (
-    df.select_dtypes(include=["object"]).columns
-)
+categorical_fields = df.select_dtypes(include=["object"]).columns
 print(categorical_fields)
 
 config = {
@@ -71,12 +73,12 @@ config = {
     "tabular-gan": {
         "epochs": 20,
         "records": 100000,
-    }
+    },
 }
 print(dataset.table.column_names)
 
 # %%
-#Train
+# Train
 train = ra.TrainTabGAN(config)
 
 builder = rf.WorkflowBuilder()
@@ -86,14 +88,14 @@ workflow = await builder.start(conn)
 print(f"Workflow: {workflow.id()}")
 
 async for log in workflow.logs():
-    print(log) 
+    print(log)
 
 model = await workflow.models().nth(0)
 await model.add_labels(conn)
 model
 
 # %%
-#Generate
+# Generate
 generate = ra.GenerateTabGAN(config)
 save = ra.DatasetSave({"name": "synthetic"})
 builder = rf.WorkflowBuilder()
@@ -109,6 +111,7 @@ async for sds in workflow.datasets():
 
 # %% [markdown]
 # Synthetic Data Assessor
+#
 
 # %%
 for col in dataset.table.column_names:
