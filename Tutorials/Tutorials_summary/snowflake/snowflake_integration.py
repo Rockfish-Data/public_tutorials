@@ -1,94 +1,78 @@
-# Rockfish Environment Key & API URL
-import rockfish as rf
-import rockfish.actions as ra
-import rockfish.labs as rl
-import asyncio
 import os
-
-import pyarrow as pa
-import pyarrow.compute as pc
-import pyarrow.csv as csv
+import asyncio
+import pandas as pd
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
-with open("./rsa_key_unencrypted.p8", "rb") as key_file:
-    private_key = serialization.load_pem_private_key(
-        key_file.read(),
-        password=None
+
+import rockfish as rf
+import rockfish.actions as ra
+
+# --- Configuration (fill in or use env vars) ---
+DB = os.getenv("SNOWFLAKE_DB", "<DB>")
+SCHEMA = os.getenv("SNOWFLAKE_SCHEMA", "<SCHEMA>")
+USER = os.getenv("SNOWFLAKE_USER", "<MYUSER>")
+ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT", "<ACCOUNT>")
+WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH")
+API_KEY = os.getenv("ROCKFISH_API_KEY", "<API_KEY>")
+API_URL = os.getenv("ROCKFISH_API_URL", "<API_URL>")
+PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH", "./rsa_key_unencrypted.p8")
+SOURCE_TABLE = os.getenv("SOURCE_TABLE", "<SOURCE_TABLE>")
+SYNTHETIC_TABLENAME = os.getenv("SYNTHETIC_TABLENAME", "<SYNTHETIC_TABLENAME>")
+DATASET_NAME = os.getenv("ROCKFISH_DATASET_NAME", "<MYDATASETNAME>")
+STAGE_NAME = f"{DB}.{SCHEMA}.ROCKFISH_STAGE"
+CSV_PATH = "./synthetic.csv"
+
+# --- Helper Functions ---
+
+def load_private_key(key_path):
+    with open(key_path, "rb") as key_file:
+        return serialization.load_pem_private_key(key_file.read(), password=None)
+
+def get_snowflake_connection():
+    private_key = load_private_key(PRIVATE_KEY_PATH)
+    return snowflake.connector.connect(
+        user=USER,
+        private_key=private_key,
+        account=ACCOUNT,
+        warehouse=WAREHOUSE,
+        database=DB,
+        schema=SCHEMA,
+        application="RockfishData_RockfishSyntheticDataPlatform"
     )
 
-conn = snowflake.connector.connect(
-     user="<MYUSER>",
-     private_key=private_key,
-     account="<ACCOUNT>",
-     warehouse="COMPUTE_WH",
-     database="<DB>",
-     schema="<SCHEMA>",
-     application="RockfishData_RockfishSyntheticDataPlatform"
- )
+def fetch_source_data(cursor):
+    cursor.execute(f"SELECT * FROM {DB}.{SCHEMA}.{SOURCE_TABLE}")
+    return cursor.fetch_pandas_all()
 
-cursor = conn.cursor()
-
-cursor.execute("""Select * from <DB>.<SCHEMA>.<SOURCE_TABLE>""")
-df = cursor.fetch_pandas_all()
-print(df.head())
-
-
-runner = asyncio
-
-api_key = "<API_KEY>"
-api_url = "<API_URL>"
-
-os.environ["ROCKFISH_API_KEY"] = "api_key"
-
-
-async def start_rockfish():
-    conn = rf.Connection.remote(api_url, api_key)
-
-    #Onboard
-    # Perform any necessary feature engineering or preprocessing
-    dataset = rf.Dataset.from_pandas("<MYDATASETNAME>",df)
-    
-    categorical_fields = (
-        df.select_dtypes(include=["object"]).columns
-    )
-    print(categorical_fields)
-    
+async def run_rockfish(df):
+    conn = rf.Connection.remote(API_URL, API_KEY)
+    dataset = rf.Dataset.from_pandas(DATASET_NAME, df)
+    categorical_fields = df.select_dtypes(include=["object"]).columns.tolist()
     config = {
         "encoder": {
             "metadata": [
-                {"field": field, "type": "categorical"}
-                for field in categorical_fields
-            ]
-            + [
+                {"field": field, "type": "categorical"} for field in categorical_fields
+            ] + [
                 {"field": field, "type": "continuous"}
-                for field in dataset.table.column_names
-                if field not in categorical_fields
-            ],
+                for field in dataset.table.column_names if field not in categorical_fields
+            ]
         },
-        "tabular-gan": {
-            "epochs": 10,
-            "records": 10000,
-        }
+        "tabular-gan": {"epochs": 10, "records": 10000}
     }
-    print(dataset.table.column_names)
 
-    #Train
+    # Train
     train = ra.TrainTabGAN(config)
-    
     builder = rf.WorkflowBuilder()
     builder.add_dataset(dataset)
     builder.add_action(train, parents=[dataset])
     workflow = await builder.start(conn)
     print(f"Training - Workflow: {workflow.id()}")
-    
     async for log in workflow.logs():
-        print(log) 
-    
+        print(log)
     model = await workflow.models().nth(0)
     await model.add_labels(conn)
-    #model
 
-    #Generate
+    # Generate
     generate = ra.GenerateTabGAN(config)
     save = ra.DatasetSave({"name": "synthetic"})
     builder = rf.WorkflowBuilder()
@@ -97,68 +81,63 @@ async def start_rockfish():
     builder.add_action(save, parents=[generate])
     workflow = await builder.start(conn)
     print(f"Generate - Workflow: {workflow.id()}")
-    
     syn = None
     async for sds in workflow.datasets():
         syn = await sds.to_local(conn)
     await conn.close()
     return syn
-syn_data = runner.run(start_rockfish())
 
-import csv
+def upload_to_snowflake_stage(cursor, file_path, stage):
+    cursor.execute(f"CREATE OR REPLACE STAGE {stage} COMMENT = 'Stage for Rockfish demo data';")
+    file_uri = f"file://{file_path}"
+    put_sql = f"PUT '{file_uri}' '@{stage}' AUTO_COMPRESS=TRUE OVERWRITE=TRUE"
+    print(f"Executing: {put_sql}")
+    put_results = cursor.execute(put_sql)
+    for row in put_results:
+        print(row)
 
-syn_data_pandas = syn_data.to_pandas()
+def load_synthetic_to_table(cursor, stage, table):
+    cursor.execute(f"TRUNCATE TABLE {DB}.{SCHEMA}.{table};")
+    cursor.execute(f"""
+        COPY INTO {DB}.{SCHEMA}.{table}
+        FROM '@{stage}/synthetic.csv.gz'
+        FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = ',' SKIP_HEADER = 1 EMPTY_FIELD_AS_NULL = TRUE FIELD_OPTIONALLY_ENCLOSED_BY = '\"')
+        ON_ERROR = 'CONTINUE';
+    """)
+    cursor.execute(f"SELECT COUNT(*) FROM {DB}.{SCHEMA}.{table};")
+    for row in cursor:
+        print(row)
+    cursor.execute(f"SELECT * FROM {DB}.{SCHEMA}.{table} LIMIT 4;")
+    for row in cursor:
+        print(row)
 
-syn_data_pandas.to_csv(f"synthetic.csv", index=False, quoting=csv.QUOTE_ALL)
-print("VVVVVVVVVVVVVVVVVVVVVVVVVVVVV")
-print("VVV Sample Synthetic Data VVV")
-print("VVVVVVVVVVVVVVVVVVVVVVVVVVVVV")
-print(syn_data_pandas.head())
+# --- Main Workflow ---
 
-cursor.execute("""CREATE OR REPLACE STAGE <DB>.<SCHEMA>.ROCKFISH_STAGE COMMENT = 'Stage for Rockfish demo data';""")
+def main():
+    os.environ["ROCKFISH_API_KEY"] = API_KEY  # For rockfish client
 
-# --- Configuration ---
-notebook_file_path_str = './synthetic.csv' # Verify this path within the notebook!
-target_stage = '@<DB>.<SCHEMA>.ROCKFISH_STAGE' # Use the fully qualified stage name
-# --- End Configuration ---
+    with get_snowflake_connection() as conn:
+        with conn.cursor() as cursor:
+            print("Fetching source data from Snowflake...")
+            df = fetch_source_data(cursor)
+            print(df.head())
 
+            print("Running Rockfish synthetic data pipeline...")
+            syn_data = asyncio.run(run_rockfish(df))
+            syn_df = syn_data.to_pandas()
+            syn_df.to_csv(CSV_PATH, index=False, quoting=1)  # quoting=csv.QUOTE_ALL = 1
 
+            print("Sample Synthetic Data:")
+            print(syn_df.head())
 
-print(f"File found at: {notebook_file_path_str}")
-# --- Prepare and Execute PUT command ---
-file_uri = f"file://{str(notebook_file_path_str)}"
-put_sql = f"PUT '{file_uri}' '{target_stage}' AUTO_COMPRESS=TRUE OVERWRITE=TRUE"
-print(f"Executing via cursor session: {put_sql}")
+            print("Uploading synthetic data to Snowflake stage...")
+            upload_to_snowflake_stage(cursor, CSV_PATH, STAGE_NAME)
 
-# Execute and fetch results correctly using Snowpark/connector methods
-put_results = cursor.execute(put_sql)
+            print("Loading synthetic data into target table...")
+            load_synthetic_to_table(cursor, STAGE_NAME, SYNTHETIC_TABLENAME)
 
-print("PUT command executed successfully.")
-print("Results:")
-for row in put_results:
-    print(row) # Connector handles getting status correctly
+    print("All done!")
 
-cursor.execute(""" TRUNCATE TABLE <DB>.<SCHEMA>.<SYNTHETIC_TABLENAME>; """)
+if __name__ == "__main__":
+    main()
 
-results = cursor.execute(""" SELECT COUNT(*) FROM <DB>.<SCHEMA>.<SYNTHETIC_TABLENAME>; """)
-print("Results:")
-for row in results:
-    print(row) # Connector handles getting status correctly
-
-results = cursor.execute(""" COPY INTO <DB>.<SCHEMA>.<SYNTHETIC_TABLENAME> FROM '@"<DB>"."<SCHEMA>"."ROCKFISH_STAGE"/synthetic.csv.gz' FILE_FORMAT = ( TYPE = CSV FIELD_DELIMITER = ',' SKIP_HEADER = 1 EMPTY_FIELD_AS_NULL = TRUE FIELD_OPTIONALLY_ENCLOSED_BY = '\"') ON_ERROR = 'CONTINUE'; """)
-print("Results:")
-for row in results:
-    print(row) # Connector handles getting status correctly
-
-results = cursor.execute(""" SELECT COUNT(*) FROM <DB>.<SCHEMA>.<SYNTHETIC_TABLENAME>; """)
-print("Results:")
-for row in results:
-    print(row) # Connector handles getting status correctly
-
-results = cursor.execute(""" SELECT * FROM <DB>.<SCHEMA>.<SYNTHETIC_TABLENAME> LIMIT 4; """)
-print("Results:")
-for row in results:
-    print(row) # Connector handles getting status correctly
-
-cursor.close()
-conn.close()
