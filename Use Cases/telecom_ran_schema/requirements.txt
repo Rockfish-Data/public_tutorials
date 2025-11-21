@@ -1,0 +1,6 @@
+-f https://packages.rockfish.ai/index.html
+rockfish[labs]>=0.46.0
+pandas
+matplotlib
+jupyter
+python-dotenv
