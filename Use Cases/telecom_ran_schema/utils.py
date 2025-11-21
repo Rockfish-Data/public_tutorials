@@ -35,7 +35,7 @@ def create_telecom_ran_schema(
     global_end_time="2025-01-03T00:00:00Z",
     global_time_interval="15min",
 ) -> DataSchema:
-    """Create the Snowflake Demo telecom RAN network schema."""
+    """Create the telecom RAN network schema."""
     # ENTITY 1: transport_link
     transport_link = Entity(
         name="transport_link",
@@ -492,7 +492,7 @@ def create_incident_telecom_ran_schema(
     global_end_time="2025-01-03T06:00:00Z",
     global_time_interval="15min",
 ) -> DataSchema:
-    """Create the Snowflake Demo telecom RAN network schema for an incident."""
+    """Create the telecom RAN network schema for an incident."""
     # ENTITY 1: transport_link
     transport_link = Entity(
         name="transport_link",
