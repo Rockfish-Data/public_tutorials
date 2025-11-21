@@ -400,6 +400,9 @@ telecom_ran_schema = DataSchema(
 import rockfish as rf
 import rockfish.actions as ra
 
+# Connect to the Rockfish platform
+conn = rf.Connection.from_env()
+
 # Configure and run generation
 config = ra.GenerateFromDataSchema.Config(schema=telecom_ran_schema)
 generate = ra.GenerateFromDataSchema(config)
