@@ -23,6 +23,8 @@ In this tutorial, we'll generate data for a telecom RAN network `DataSchema` wit
 - **core_node**: Core network elements like MME, AMF, SMF, UPF
 - **cell_site**: Radio access points serving end users
 
+The exact schema definition can be found in the tutorial code [here](utils.py).
+
 ### 1.1 Creating Entities
 
 An `Entity` represents a table in your synthetic dataset. Each entity has:
@@ -125,7 +127,7 @@ Rockfish ensures referential integrity automatically.
 
 ## 2. The Timeseries Data Model
 
-Rockfish's [timeseries data model](TBD) organizes columns into two categories (metadata, measurement) that reflect 
+Rockfish's [timeseries data model](https://docs.rockfish.ai/data-models.html#time-series-data) organizes columns into two categories (metadata, measurement) that reflect 
 how timeseries data is typically structured. 
 We'll focus on **`cell_site`** as our primary example for the subsequent sections.
 
@@ -376,7 +378,7 @@ Column(
 - **SAMPLE_FROM_COLUMN**: Sample values based on conditions (e.g., error codes based on failure status)
 - **MAP_VALUES**: Transform values using rules (e.g., "high"/"medium"/"low" from numeric thresholds)
 
-See the [full API documentation](TBD) for details on all derivation types.
+See the [full API documentation](https://docs.rockfish.ai/sdk/actions-ent.html#rockfish.actions.ent.Derivation) for details on all derivation types.
 
 ## 5. Assembling the Complete Schema
 
@@ -482,4 +484,3 @@ Rockfish automatically generates columns in the following order:
 
 **Learn more:**
 - [Full API Documentation](https://docs.rockfish.ai/sdk/actions-ent.html)
-- [Tutorial Repository](TBD)
