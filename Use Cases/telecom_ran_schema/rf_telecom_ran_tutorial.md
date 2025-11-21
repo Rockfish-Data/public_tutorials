@@ -1,4 +1,4 @@
-# Rockfish Entity Data Generator Tutorial: Telecom RAN Network
+# Rockfish Entity Data Generator Tutorial: Telecom RAN Data
 
 ## Overview
 
