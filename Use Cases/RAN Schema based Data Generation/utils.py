@@ -457,15 +457,15 @@ def create_telecom_ran_schema(
 
     # ENTITY RELATIONSHIPS
     relationships = [
-        # cell_site -> transport_link
+        # transport_link -> cell_site (one-to-many)
         # Cells connect to transport network via specific device/interface pairs
         EntityRelationship(
-            from_entity="cell_site",
-            to_entity="transport_link",
-            relationship_type=EntityRelationshipType.MANY_TO_ONE,
+            parent_entity="transport_link",
+            child_entity="cell_site",
+            relationship_type=EntityRelationshipType.ONE_TO_MANY,
             join_columns={
-                "Transport_Device_ID": "Device_ID",
-                "Transport_Interface_ID": "Interface_ID",
+                "Device_ID": "Transport_Device_ID",
+                "Interface_ID": "Transport_Interface_ID",
             },
         ),
     ]
@@ -905,15 +905,15 @@ def create_incident_telecom_ran_schema(
 
     # ENTITY RELATIONSHIPS
     relationships = [
-        # cell_site -> transport_link
+        # transport_link -> cell_site (one-to-many)
         # Cells connect to transport network via specific device/interface pairs
         EntityRelationship(
-            from_entity="cell_site",
-            to_entity="transport_link",
-            relationship_type=EntityRelationshipType.MANY_TO_ONE,
+            parent_entity="transport_link",
+            child_entity="cell_site",
+            relationship_type=EntityRelationshipType.ONE_TO_MANY,
             join_columns={
-                "Transport_Device_ID": "Device_ID",
-                "Transport_Interface_ID": "Interface_ID",
+                "Device_ID": "Transport_Device_ID",
+                "Interface_ID": "Transport_Interface_ID",
             },
         ),
     ]

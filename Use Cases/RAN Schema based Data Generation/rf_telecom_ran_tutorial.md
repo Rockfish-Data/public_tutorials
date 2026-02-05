@@ -105,24 +105,24 @@ Column(
 ```python
 relationships = [
     EntityRelationship(
-        from_entity="cell_site",
-        to_entity="transport_link",
-        relationship_type=EntityRelationshipType.MANY_TO_ONE,
+        parent_entity="transport_link",
+        child_entity="cell_site",
+        relationship_type=EntityRelationshipType.ONE_TO_MANY,
         join_columns={
-            "Transport_Device_ID": "Device_ID",
-            "Transport_Interface_ID": "Interface_ID",
+            "Device_ID": "Transport_Device_ID",
+            "Interface_ID": "Transport_Interface_ID",
         },
     ),
 ]
 ```
 
 **Parameters:**
-- `from_entity`: Entity with foreign keys (`cell_site`)
-- `to_entity`: Entity being referenced (`transport_link`)
-- `relationship_type`: `MANY_TO_ONE`, `ONE_TO_ONE`, or `ONE_TO_MANY`
-- `join_columns`: Maps foreign key columns to target columns (format: `{foreign_key: target_column}`)
+- `parent_entity`: Entity being referenced (`transport_link`)
+- `child_entity`: Entity with foreign keys (`cell_site`)
+- `relationship_type`: `ONE_TO_MANY`, `ONE_TO_ONE` (from parent's perspective)
+- `join_columns`: Maps parent columns to child FK columns (format: `{parent_column: child_fk_column}`)
 
-In our example, each `cell_site` references a valid (`Device_ID`, `Interface_ID`) pair from `transport_link`.
+In our example, each `transport_link` can have multiple `cell_site` entities referencing it via (`Device_ID`, `Interface_ID`).
 Rockfish ensures referential integrity automatically.
 
 ## 2. The Timeseries Data Model
