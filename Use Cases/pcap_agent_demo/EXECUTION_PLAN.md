@@ -265,18 +265,239 @@ class BlendedPCAPGenerator:
 
 ---
 
-## Phase 3: Baseline Dataset (Without Rockfish)
+## Phase 3: Baseline Dataset (Pure Python + Faker - No Rockfish)
 
 **File:** `03_create_baseline_pcap.py`
 
-**Purpose:** Create a manually-crafted baseline PCAP dataset and queries for comparison testing.
+**Purpose:** Create a PCAP dataset from scratch using only basic Python libraries (Faker, numpy, pandas). This serves as a comparison baseline generated without any Rockfish APIs or templates.
 
-### 3.1 Baseline Dataset Characteristics
+### 3.1 Approach: Pure Faker-Based Generation
 
-Create a smaller, deterministic dataset using standard Python/numpy (no Rockfish):
+Generate PCAP data entirely from scratch using the Faker library for realistic network data:
 
 ```python
 # 03_create_baseline_pcap.py
+
+from faker import Faker
+import pandas as pd
+import numpy as np
+import random
+from datetime import datetime, timedelta
+import uuid
+
+fake = Faker()
+
+# Service definitions with realistic port mappings
+SERVICES = {
+    'HTTP': {'port': 80, 'protocol': 'TCP'},
+    'HTTPS': {'port': 443, 'protocol': 'TCP'},
+    'SSH': {'port': 22, 'protocol': 'TCP'},
+    'FTP': {'port': 21, 'protocol': 'TCP'},
+    'DNS': {'port': 53, 'protocol': 'UDP'},
+    'SMTP': {'port': 25, 'protocol': 'TCP'},
+    'MySQL': {'port': 3306, 'protocol': 'TCP'},
+    'PostgreSQL': {'port': 5432, 'protocol': 'TCP'},
+}
+
+TCP_FLAGS = ['SYN', 'SYN-ACK', 'ACK', 'PSH-ACK', 'FIN-ACK', 'RST']
+
+def generate_ip_address(internal: bool = True) -> str:
+    """Generate realistic IP addresses using Faker."""
+    if internal:
+        # Internal subnets
+        subnet = random.choice(['10.1', '10.2', '192.168.1', '192.168.2'])
+        return f"{subnet}.{fake.pyint(min_value=1, max_value=254)}.{fake.pyint(min_value=1, max_value=254)}"
+    else:
+        return fake.ipv4_public()
+
+def generate_mac_address() -> str:
+    """Generate MAC address using Faker."""
+    return fake.mac_address()
+
+def generate_normal_session(session_id: str, service_name: str, start_time: datetime) -> list:
+    """Generate a normal TCP session with realistic packet flow."""
+    service = SERVICES[service_name]
+    src_ip = generate_ip_address(internal=True)
+    dst_ip = generate_ip_address(internal=False) if service_name in ['HTTP', 'HTTPS'] else generate_ip_address(internal=True)
+    src_port = fake.pyint(min_value=49152, max_value=65535)  # Ephemeral port
+    dst_port = service['port']
+
+    packets = []
+    current_time = start_time
+
+    # TCP Handshake
+    for flag in ['SYN', 'SYN-ACK', 'ACK']:
+        packets.append({
+            'session_id': session_id,
+            'packet_timestamp': current_time.isoformat(),
+            'src_ip': src_ip if flag != 'SYN-ACK' else dst_ip,
+            'dst_ip': dst_ip if flag != 'SYN-ACK' else src_ip,
+            'src_port': src_port if flag != 'SYN-ACK' else dst_port,
+            'dst_port': dst_port if flag != 'SYN-ACK' else src_port,
+            'src_mac': generate_mac_address(),
+            'dst_mac': generate_mac_address(),
+            'protocol': service['protocol'],
+            'tcp_flags': flag,
+            'packet_size': fake.pyint(min_value=40, max_value=80),
+            'ttl': fake.pyint(min_value=60, max_value=128),
+            'window_size': fake.pyint(min_value=16384, max_value=65535),
+            'service_name': service_name,
+            'direction': 'C2S' if flag != 'SYN-ACK' else 'S2C',
+        })
+        current_time += timedelta(milliseconds=fake.pyint(min_value=1, max_value=50))
+
+    # Data exchange (5-20 packets)
+    n_data_packets = fake.pyint(min_value=5, max_value=20)
+    for i in range(n_data_packets):
+        is_client = i % 2 == 0
+        packets.append({
+            'session_id': session_id,
+            'packet_timestamp': current_time.isoformat(),
+            'src_ip': src_ip if is_client else dst_ip,
+            'dst_ip': dst_ip if is_client else src_ip,
+            'src_port': src_port if is_client else dst_port,
+            'dst_port': dst_port if is_client else src_port,
+            'src_mac': generate_mac_address(),
+            'dst_mac': generate_mac_address(),
+            'protocol': service['protocol'],
+            'tcp_flags': 'PSH-ACK',
+            'packet_size': fake.pyint(min_value=100, max_value=1500),
+            'ttl': fake.pyint(min_value=60, max_value=128),
+            'window_size': fake.pyint(min_value=16384, max_value=65535),
+            'service_name': service_name,
+            'direction': 'C2S' if is_client else 'S2C',
+        })
+        current_time += timedelta(milliseconds=fake.pyint(min_value=10, max_value=500))
+
+    # TCP Teardown
+    for flag in ['FIN-ACK', 'ACK']:
+        packets.append({
+            'session_id': session_id,
+            'packet_timestamp': current_time.isoformat(),
+            'src_ip': src_ip,
+            'dst_ip': dst_ip,
+            'src_port': src_port,
+            'dst_port': dst_port,
+            'src_mac': generate_mac_address(),
+            'dst_mac': generate_mac_address(),
+            'protocol': service['protocol'],
+            'tcp_flags': flag,
+            'packet_size': fake.pyint(min_value=40, max_value=80),
+            'ttl': fake.pyint(min_value=60, max_value=128),
+            'window_size': fake.pyint(min_value=16384, max_value=65535),
+            'service_name': service_name,
+            'direction': 'C2S',
+        })
+        current_time += timedelta(milliseconds=fake.pyint(min_value=1, max_value=50))
+
+    return packets
+
+def generate_anomaly_port_scan(session_id: str, start_time: datetime) -> list:
+    """Generate port scan pattern - many SYN packets to different ports, RST responses."""
+    src_ip = generate_ip_address(internal=True)
+    dst_ip = generate_ip_address(internal=True)
+    packets = []
+    current_time = start_time
+
+    # Scan 20-50 ports rapidly
+    n_ports = fake.pyint(min_value=20, max_value=50)
+    scanned_ports = random.sample(range(1, 1024), n_ports)
+
+    for port in scanned_ports:
+        # SYN packet
+        packets.append({
+            'session_id': f"{session_id}_port_{port}",
+            'packet_timestamp': current_time.isoformat(),
+            'src_ip': src_ip,
+            'dst_ip': dst_ip,
+            'src_port': fake.pyint(min_value=49152, max_value=65535),
+            'dst_port': port,
+            'src_mac': generate_mac_address(),
+            'dst_mac': generate_mac_address(),
+            'protocol': 'TCP',
+            'tcp_flags': 'SYN',
+            'packet_size': fake.pyint(min_value=40, max_value=60),
+            'ttl': fake.pyint(min_value=60, max_value=128),
+            'window_size': fake.pyint(min_value=1024, max_value=4096),
+            'service_name': 'SCAN',
+            'direction': 'C2S',
+        })
+        # RST response (port closed) or no response
+        if random.random() > 0.3:  # 70% ports closed
+            packets.append({
+                'session_id': f"{session_id}_port_{port}",
+                'packet_timestamp': (current_time + timedelta(milliseconds=fake.pyint(min_value=1, max_value=10))).isoformat(),
+                'src_ip': dst_ip,
+                'dst_ip': src_ip,
+                'src_port': port,
+                'dst_port': packets[-1]['src_port'],
+                'src_mac': generate_mac_address(),
+                'dst_mac': generate_mac_address(),
+                'protocol': 'TCP',
+                'tcp_flags': 'RST',
+                'packet_size': fake.pyint(min_value=40, max_value=60),
+                'ttl': fake.pyint(min_value=60, max_value=128),
+                'window_size': 0,
+                'service_name': 'SCAN',
+                'direction': 'S2C',
+            })
+        current_time += timedelta(milliseconds=fake.pyint(min_value=5, max_value=50))
+
+    return packets
+
+def generate_anomaly_beaconing(session_id: str, start_time: datetime) -> list:
+    """Generate C2 beaconing pattern - regular interval small packets."""
+    src_ip = generate_ip_address(internal=True)
+    dst_ip = fake.ipv4_public()  # External C2 server
+    packets = []
+    current_time = start_time
+
+    # Beacon every 60 seconds (+/- small jitter) for 10-20 beacons
+    beacon_interval = 60  # seconds
+    n_beacons = fake.pyint(min_value=10, max_value=20)
+
+    for i in range(n_beacons):
+        # Small beacon packet (check-in)
+        packets.append({
+            'session_id': session_id,
+            'packet_timestamp': current_time.isoformat(),
+            'src_ip': src_ip,
+            'dst_ip': dst_ip,
+            'src_port': fake.pyint(min_value=49152, max_value=65535),
+            'dst_port': 443,  # Hiding in HTTPS
+            'src_mac': generate_mac_address(),
+            'dst_mac': generate_mac_address(),
+            'protocol': 'TCP',
+            'tcp_flags': 'PSH-ACK',
+            'packet_size': fake.pyint(min_value=50, max_value=100),  # Small, consistent
+            'ttl': fake.pyint(min_value=60, max_value=128),
+            'window_size': fake.pyint(min_value=16384, max_value=65535),
+            'service_name': 'HTTPS',
+            'direction': 'C2S',
+        })
+        # Response
+        packets.append({
+            'session_id': session_id,
+            'packet_timestamp': (current_time + timedelta(milliseconds=fake.pyint(min_value=100, max_value=500))).isoformat(),
+            'src_ip': dst_ip,
+            'dst_ip': src_ip,
+            'src_port': 443,
+            'dst_port': packets[-1]['src_port'],
+            'src_mac': generate_mac_address(),
+            'dst_mac': generate_mac_address(),
+            'protocol': 'TCP',
+            'tcp_flags': 'PSH-ACK',
+            'packet_size': fake.pyint(min_value=50, max_value=150),
+            'ttl': fake.pyint(min_value=40, max_value=64),
+            'window_size': fake.pyint(min_value=16384, max_value=65535),
+            'service_name': 'HTTPS',
+            'direction': 'S2C',
+        })
+        # Add jitter to next beacon
+        jitter = fake.pyint(min_value=-5, max_value=5)
+        current_time += timedelta(seconds=beacon_interval + jitter)
+
+    return packets
 
 def create_baseline_pcap_dataset(
     n_normal_sessions: int = 500,
@@ -284,42 +505,76 @@ def create_baseline_pcap_dataset(
     n_suspicious_sessions: int = 30,
     seed: int = 42
 ) -> pd.DataFrame:
-    """Create a baseline PCAP dataset using deterministic rules."""
+    """Create a baseline PCAP dataset using Faker - no Rockfish dependencies."""
 
+    Faker.seed(seed)
+    random.seed(seed)
     np.random.seed(seed)
+
     packets = []
+    base_time = datetime(2025, 3, 1, 9, 0, 0)
 
-    # Normal sessions: well-formed TCP with predictable patterns
+    # Normal sessions
     for i in range(n_normal_sessions):
+        service = random.choice(list(SERVICES.keys()))
+        start_time = base_time + timedelta(seconds=random.randint(0, 86400))
         session_packets = generate_normal_session(
-            session_id=f"NORMAL_{i}",
-            service=pick_service(),
-            duration_seconds=np.random.exponential(30)
+            session_id=f"NORMAL_{i:04d}",
+            service_name=service,
+            start_time=start_time
         )
+        for pkt in session_packets:
+            pkt['traffic_category'] = 'normal'
+            pkt['template_type'] = f'normal_{service.lower()}'
         packets.extend(session_packets)
 
-    # Anomalous sessions: specific attack patterns
+    # Anomalous sessions
+    anomaly_generators = {
+        'port_scan': generate_anomaly_port_scan,
+        'beaconing': generate_anomaly_beaconing,
+    }
     for i in range(n_anomalous_sessions):
-        anomaly_type = pick_anomaly_type()
-        session_packets = generate_anomaly_session(
-            session_id=f"ANOMALY_{i}",
-            anomaly_type=anomaly_type
+        anomaly_type = random.choice(list(anomaly_generators.keys()))
+        start_time = base_time + timedelta(seconds=random.randint(0, 86400))
+        session_packets = anomaly_generators[anomaly_type](
+            session_id=f"ANOMALY_{i:04d}",
+            start_time=start_time
         )
+        for pkt in session_packets:
+            pkt['traffic_category'] = 'anomalous'
+            pkt['template_type'] = f'anomaly_{anomaly_type}'
         packets.extend(session_packets)
 
-    # Suspicious sessions: borderline behaviors
+    # Suspicious sessions (reuse patterns with slight variations)
     for i in range(n_suspicious_sessions):
-        suspicious_type = pick_suspicious_type()
-        session_packets = generate_suspicious_session(
-            session_id=f"SUSPICIOUS_{i}",
-            suspicious_type=suspicious_type
+        service = random.choice(['SSH', 'MySQL'])
+        start_time = base_time + timedelta(seconds=random.randint(0, 86400))
+        session_packets = generate_normal_session(
+            session_id=f"SUSPICIOUS_{i:04d}",
+            service_name=service,
+            start_time=start_time
         )
+        for pkt in session_packets:
+            pkt['traffic_category'] = 'suspicious'
+            pkt['template_type'] = 'suspicious_unusual_access'
         packets.extend(session_packets)
 
     df = pd.DataFrame(packets)
-    df['traffic_category'] = df['session_id'].apply(extract_category)
+    df = df.sort_values('packet_timestamp').reset_index(drop=True)
     return df
 ```
+
+### 3.2 Key Differences from Rockfish Approach
+
+| Aspect | Rockfish (Phase 1-2) | Baseline (Phase 3) |
+|--------|---------------------|-------------------|
+| **IP Generation** | Rockfish Entity Generator | Faker `ipv4_public()` / `ipv4_private()` |
+| **Timing** | State machine with distribution modeling | Simple `timedelta` with random offsets |
+| **Packet Sizes** | Distribution-based from schema | Faker `pyint()` with min/max ranges |
+| **MAC Addresses** | Entity-linked generation | Faker `mac_address()` |
+| **Session Flow** | Complex state machines | Hardcoded TCP handshake sequence |
+| **Realism** | Statistical modeling of real patterns | Rule-based with randomization |
+| **Dependencies** | rockfish, rockfish-actions | faker, pandas, numpy only |
 
 ### 3.2 Baseline Query Set
 
@@ -917,15 +1172,17 @@ pcap_agent_demo/
 
 ## Execution Order
 
-| Step | Phase | Script/Notebook | Inputs | Outputs |
-|------|-------|-----------------|--------|---------|
-| 1 | Phase 1 | `01_pcap_template_generation.ipynb` | Existing PCAP notebook | `templates/pcap_templates.py` |
-| 2 | Phase 2 | `02_generate_blended_pcap.py` | Templates + config | `generated_data/week_simulation/` |
-| 3 | Phase 3 | `03_create_baseline_pcap.py` | None (self-contained) | `baseline_data/` |
-| 4 | Phase 4 | Agent setup | - | `agents/pcap_agent/` |
-| 5 | Phase 5 | `04_generate_pcap_test_suite.py` | Datasets | `workload_data/` |
-| 6 | Phase 6 | `05_evaluate_pcap_agent.py` | Agent + workloads | `outputs/` |
-| 7 | Phase 7 | `06_data_quality_report.py` | Datasets | `reports/` |
+| Step | Phase | Script/Notebook | Inputs | Outputs | Dependencies |
+|------|-------|-----------------|--------|---------|--------------|
+| 1 | Phase 1 | `01_pcap_template_generation.ipynb` | Existing PCAP notebook | `templates/pcap_templates.py` | Rockfish |
+| 2 | Phase 2 | `02_generate_blended_pcap.py` | Templates + config | `generated_data/week_simulation/` | Rockfish |
+| 3 | Phase 3 | `03_create_baseline_pcap.py` | None (self-contained) | `baseline_data/` | **Faker only** |
+| 4 | Phase 4 | Agent setup | - | `agents/pcap_agent/` | LangChain |
+| 5 | Phase 5 | `04_generate_pcap_test_suite.py` | Datasets | `workload_data/` | Rockfish (optional) |
+| 6 | Phase 6 | `05_evaluate_pcap_agent.py` | Agent + workloads | `outputs/` | Hydra |
+| 7 | Phase 7 | `06_data_quality_report.py` | Datasets | `reports/` | pandas, matplotlib |
+
+**Note:** Phase 3 is completely independent and can run without any Rockfish installation.
 
 ---
 
@@ -944,17 +1201,36 @@ pcap_agent_demo/
 
 ```txt
 # requirements.txt
-rockfish>=0.1.0
+
+# Core (all phases)
 pandas>=2.0.0
 numpy>=1.24.0
 pyyaml>=6.0
+
+# Rockfish phases (1, 2, 5 Rockfish path)
+rockfish>=0.1.0
+
+# Baseline generation (Phase 3 - NO Rockfish needed)
+faker>=18.0.0
+
+# Agent framework (Phase 4, 5, 6)
 hydra-core>=1.3.0
 omegaconf>=2.3.0
 langchain>=0.1.0
 langchain-anthropic>=0.1.0
 python-dotenv>=1.0.0
+
+# Utilities
 requests>=2.31.0
 matplotlib>=3.7.0
 seaborn>=0.12.0
 jinja2>=3.1.0  # For HTML reports
+```
+
+**Note:** Phase 3 (Baseline Dataset) can run with minimal dependencies:
+```txt
+# Minimal requirements for baseline only
+pandas>=2.0.0
+numpy>=1.24.0
+faker>=18.0.0
 ```
