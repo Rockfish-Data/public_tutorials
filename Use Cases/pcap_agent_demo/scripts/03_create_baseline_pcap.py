@@ -53,7 +53,7 @@ SERVICES = {
     "REDIS": {"port": 6379, "protocol": "TCP"},
 }
 
-TCP_FLAGS = ["SYN", "SYN-ACK", "ACK", "PSH-ACK", "FIN-ACK", "RST"]
+TCP_FLAGS = ["SYN", "SYN,ACK", "ACK", "PSH,ACK", "FIN,ACK", "RST"]
 
 
 # =============================================================================
@@ -103,9 +103,9 @@ def generate_normal_session(
     current_time = start_time
 
     # TCP Handshake
-    handshake_flags = ["SYN", "SYN-ACK", "ACK"]
+    handshake_flags = ["SYN", "SYN,ACK", "ACK"]
     for i, flag in enumerate(handshake_flags):
-        is_server = flag == "SYN-ACK"
+        is_server = flag == "SYN,ACK"
         packets.append({
             "session_id": session_id,
             "packet_timestamp": current_time.isoformat(),
@@ -142,7 +142,7 @@ def generate_normal_session(
             "src_mac": src_mac if is_client else dst_mac,
             "dst_mac": dst_mac if is_client else src_mac,
             "protocol": service["protocol"],
-            "tcp_flags": "PSH-ACK",
+            "tcp_flags": "PSH,ACK",
             "tcp_state": "ESTABLISHED",
             "packet_type": "PSH_ACK_C2S" if is_client else "PSH_ACK_S2C",
             "packet_size": fake.pyint(min_value=100, max_value=1500),
@@ -154,27 +154,31 @@ def generate_normal_session(
         })
         current_time += timedelta(milliseconds=fake.pyint(min_value=10, max_value=500))
 
-    # TCP Teardown
-    teardown_flags = ["FIN-ACK", "ACK"]
-    for flag in teardown_flags:
+    # TCP Teardown: FIN (C2S) → FIN,ACK (S2C) → ACK (C2S)
+    teardown = [
+        ("FIN", "FIN_WAIT", "FIN", False),
+        ("FIN,ACK", "CLOSE_WAIT", "FIN_ACK", True),
+        ("ACK", "TIME_WAIT", "ACK", False),
+    ]
+    for flag, state, pkt_type, is_server in teardown:
         packets.append({
             "session_id": session_id,
             "packet_timestamp": current_time.isoformat(),
-            "src_ip": src_ip,
-            "dst_ip": dst_ip,
-            "src_port": src_port,
-            "dst_port": dst_port,
-            "src_mac": src_mac,
-            "dst_mac": dst_mac,
+            "src_ip": dst_ip if is_server else src_ip,
+            "dst_ip": src_ip if is_server else dst_ip,
+            "src_port": dst_port if is_server else src_port,
+            "dst_port": src_port if is_server else dst_port,
+            "src_mac": dst_mac if is_server else src_mac,
+            "dst_mac": src_mac if is_server else dst_mac,
             "protocol": service["protocol"],
             "tcp_flags": flag,
-            "tcp_state": "FIN_WAIT" if flag == "FIN-ACK" else "TIME_WAIT",
-            "packet_type": flag.replace("-", "_"),
+            "tcp_state": state,
+            "packet_type": pkt_type,
             "packet_size": fake.pyint(min_value=40, max_value=60),
             "ttl": fake.pyint(min_value=60, max_value=128),
             "window_size": fake.pyint(min_value=16384, max_value=65535),
             "service_name": service_name,
-            "direction": "C2S",
+            "direction": "S2C" if is_server else "C2S",
             "packet_size_category": "control",
         })
         current_time += timedelta(milliseconds=fake.pyint(min_value=1, max_value=50))
@@ -280,7 +284,7 @@ def generate_anomaly_beaconing(session_id: str, start_time: datetime) -> list:
             "src_mac": src_mac,
             "dst_mac": dst_mac,
             "protocol": "TCP",
-            "tcp_flags": "PSH-ACK",
+            "tcp_flags": "PSH,ACK",
             "tcp_state": "ESTABLISHED",
             "packet_type": "PSH_ACK_C2S",
             "packet_size": fake.pyint(min_value=50, max_value=100),  # Small, consistent
@@ -304,7 +308,7 @@ def generate_anomaly_beaconing(session_id: str, start_time: datetime) -> list:
             "src_mac": dst_mac,
             "dst_mac": src_mac,
             "protocol": "TCP",
-            "tcp_flags": "PSH-ACK",
+            "tcp_flags": "PSH,ACK",
             "tcp_state": "ESTABLISHED",
             "packet_type": "PSH_ACK_S2C",
             "packet_size": fake.pyint(min_value=50, max_value=150),
@@ -335,8 +339,8 @@ def generate_anomaly_large_upload(session_id: str, start_time: datetime) -> list
     dst_port = 443  # HTTPS
 
     # Handshake
-    for flag, state in [("SYN", "SYN_SENT"), ("SYN-ACK", "SYN_RECEIVED"), ("ACK", "ESTABLISHED")]:
-        is_server = flag == "SYN-ACK"
+    for flag, state in [("SYN", "SYN_SENT"), ("SYN,ACK", "SYN_RECEIVED"), ("ACK", "ESTABLISHED")]:
+        is_server = flag == "SYN,ACK"
         packets.append({
             "session_id": session_id,
             "packet_timestamp": current_time.isoformat(),
@@ -374,7 +378,7 @@ def generate_anomaly_large_upload(session_id: str, start_time: datetime) -> list
             "src_mac": src_mac if is_upload else dst_mac,
             "dst_mac": dst_mac if is_upload else src_mac,
             "protocol": "TCP",
-            "tcp_flags": "PSH-ACK" if is_upload else "ACK",
+            "tcp_flags": "PSH,ACK" if is_upload else "ACK",
             "tcp_state": "ESTABLISHED",
             "packet_type": "PSH_ACK_C2S" if is_upload else "ACK",
             "packet_size": fake.pyint(min_value=1400, max_value=1500) if is_upload else fake.pyint(min_value=40, max_value=60),
@@ -456,8 +460,8 @@ def generate_suspicious_brute_force(session_id: str, start_time: datetime) -> li
         attempt_session_id = f"{session_id}_attempt_{attempt}"
 
         # Quick handshake
-        for flag, state in [("SYN", "SYN_SENT"), ("SYN-ACK", "SYN_RECEIVED"), ("ACK", "ESTABLISHED")]:
-            is_server = flag == "SYN-ACK"
+        for flag, state in [("SYN", "SYN_SENT"), ("SYN,ACK", "SYN_RECEIVED"), ("ACK", "ESTABLISHED")]:
+            is_server = flag == "SYN,ACK"
             packets.append({
                 "session_id": attempt_session_id,
                 "packet_timestamp": current_time.isoformat(),
@@ -491,7 +495,7 @@ def generate_suspicious_brute_force(session_id: str, start_time: datetime) -> li
             "src_mac": src_mac,
             "dst_mac": dst_mac,
             "protocol": "TCP",
-            "tcp_flags": "PSH-ACK",
+            "tcp_flags": "PSH,ACK",
             "tcp_state": "ESTABLISHED",
             "packet_type": "PSH_ACK_C2S",
             "packet_size": fake.pyint(min_value=100, max_value=200),
@@ -576,9 +580,9 @@ def generate_suspicious_lateral_movement(session_id: str, start_time: datetime) 
 # =============================================================================
 
 def create_baseline_pcap_dataset(
-    n_normal_sessions: int = 500,
-    n_anomalous_sessions: int = 50,
-    n_suspicious_sessions: int = 30,
+    n_normal_sessions: int = 2600,
+    n_anomalous_sessions: int = 220,
+    n_suspicious_sessions: int = 75,
     seed: int = 42,
     start_time: Optional[datetime] = None,
 ) -> pd.DataFrame:
@@ -604,6 +608,22 @@ def create_baseline_pcap_dataset(
 
     packets = []
 
+    # Map services to Rockfish-style template names
+    service_to_template = {
+        "HTTP": "web_browsing",
+        "HTTPS": "web_browsing",
+        "SSH": "ssh_session",
+        "FTP": "file_transfer",
+        "DNS": "database_query",
+        "SMTP": "email",
+        "IMAP": "email",
+        "MYSQL": "database_query",
+        "POSTGRESQL": "database_query",
+        "SMB": "file_transfer",
+        "RDP": "ssh_session",
+        "REDIS": "api_calls",
+    }
+
     print(f"Generating {n_normal_sessions} normal sessions...")
     # Normal sessions
     normal_services = list(SERVICES.keys())
@@ -617,7 +637,7 @@ def create_baseline_pcap_dataset(
         )
         for pkt in session_packets:
             pkt["traffic_category"] = "normal"
-            pkt["template_type"] = f"normal_{service.lower()}"
+            pkt["template_type"] = service_to_template.get(service, service.lower())
         packets.extend(session_packets)
 
         if (i + 1) % 100 == 0:
@@ -640,7 +660,7 @@ def create_baseline_pcap_dataset(
         )
         for pkt in session_packets:
             pkt["traffic_category"] = "anomalous"
-            pkt["template_type"] = f"anomaly_{anomaly_type}"
+            pkt["template_type"] = anomaly_type
         packets.extend(session_packets)
 
         if (i + 1) % 10 == 0:
@@ -661,7 +681,7 @@ def create_baseline_pcap_dataset(
         )
         for pkt in session_packets:
             pkt["traffic_category"] = "suspicious"
-            pkt["template_type"] = f"suspicious_{suspicious_type}"
+            pkt["template_type"] = suspicious_type
         packets.extend(session_packets)
 
         if (i + 1) % 10 == 0:
@@ -687,19 +707,19 @@ def main():
     parser.add_argument(
         "--normal",
         type=int,
-        default=500,
+        default=2600,
         help="Number of normal sessions",
     )
     parser.add_argument(
         "--anomalous",
         type=int,
-        default=50,
+        default=220,
         help="Number of anomalous sessions",
     )
     parser.add_argument(
         "--suspicious",
         type=int,
-        default=30,
+        default=75,
         help="Number of suspicious sessions",
     )
     parser.add_argument(
