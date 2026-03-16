@@ -3,6 +3,7 @@ rockfish>=0.1.0
 pandas>=2.0.0
 numpy>=1.24.0
 pyyaml>=6.0
+faker>=18.0.0  # For baseline generation (Phase 3)
 hydra-core>=1.3.0
 omegaconf>=2.3.0
 langchain>=0.1.0
