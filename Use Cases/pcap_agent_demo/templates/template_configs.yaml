@@ -1,0 +1,375 @@
+# PCAP Template Configuration
+# This file defines the default parameters for each traffic pattern template
+
+# =============================================================================
+# NORMAL FLOW TEMPLATES
+# =============================================================================
+normal:
+  web_browsing:
+    description: "Standard HTTP/HTTPS web browsing sessions"
+    characteristics:
+      - "Full TCP handshake"
+      - "5-15 data packets (request + response)"
+      - "Graceful close"
+      - "Mix of HTTP (80) and HTTPS (443)"
+    default_params:
+      n_sessions: 100
+      n_client_hosts: 50
+      n_server_hosts: 20
+    state_machine:
+      data_packet_probability: 0.70  # PSH_ACK_C2S + PSH_ACK_S2C
+      fin_probability: 0.15
+    packet_size:
+      control_range: [40, 60]
+      data_scale: 600  # exponential distribution scale
+
+  api_calls:
+    description: "REST API request/response patterns"
+    characteristics:
+      - "Full handshake"
+      - "1-3 request packets"
+      - "1-5 response packets"
+      - "Quick close"
+    default_params:
+      n_sessions: 100
+      n_client_hosts: 30
+      n_server_hosts: 10
+    state_machine:
+      data_packet_probability: 0.60
+      fin_probability: 0.25
+    packet_size:
+      control_range: [40, 60]
+      data_scale: 300
+
+  ssh_session:
+    description: "Interactive SSH traffic"
+    characteristics:
+      - "Full handshake"
+      - "Sustained bidirectional traffic (many small packets)"
+      - "Long session duration"
+      - "Graceful close"
+    default_params:
+      n_sessions: 50
+      n_client_hosts: 20
+      n_server_hosts: 10
+    state_machine:
+      data_packet_probability: 0.75
+      fin_probability: 0.05  # Long sessions
+    packet_size:
+      control_range: [40, 60]
+      data_scale: 100  # Small packets for interactive
+
+  file_transfer:
+    description: "FTP/SMB file download patterns"
+    characteristics:
+      - "Full handshake"
+      - "Many large S2C packets (server sending file)"
+      - "Small C2S packets (ACKs and commands)"
+      - "Graceful close"
+    default_params:
+      n_sessions: 50
+      n_client_hosts: 30
+      n_server_hosts: 10
+    state_machine:
+      s2c_probability: 0.55  # Heavy download
+      c2s_probability: 0.10  # Light commands
+      fin_probability: 0.10
+    packet_size:
+      control_range: [40, 60]
+      data_scale: 1000  # Large packets
+
+  database_query:
+    description: "MySQL/PostgreSQL query patterns"
+    characteristics:
+      - "Full handshake"
+      - "Small request packet (query)"
+      - "Variable response size (result set)"
+      - "Quick close or connection pooling"
+    default_params:
+      n_sessions: 100
+      n_client_hosts: 20
+      n_server_hosts: 5
+    state_machine:
+      c2s_probability: 0.20  # Query
+      s2c_probability: 0.45  # Result set
+      fin_probability: 0.20
+    packet_size:
+      control_range: [40, 60]
+      data_scale: 400
+
+  email:
+    description: "SMTP/IMAP email traffic"
+    characteristics:
+      - "Full handshake"
+      - "Protocol-specific exchanges (HELO, AUTH, DATA)"
+      - "Moderate packet sizes"
+      - "Graceful close"
+    default_params:
+      n_sessions: 50
+      n_client_hosts: 30
+      n_server_hosts: 5
+    state_machine:
+      data_packet_probability: 0.65
+      fin_probability: 0.15
+    packet_size:
+      control_range: [40, 60]
+      data_scale: 200
+
+# =============================================================================
+# ANOMALOUS FLOW TEMPLATES
+# =============================================================================
+anomalous:
+  port_scan:
+    description: "Sequential port probing"
+    characteristics:
+      - "SYN -> RST (repeated across many ports)"
+      - "Very short sessions (1-2 packets)"
+      - "Many destination ports from same source"
+      - "No data transfer"
+    default_params:
+      n_sessions: 200
+      n_client_hosts: 5  # Few attackers
+      n_server_hosts: 50  # Many targets
+    state_machine:
+      rst_probability: 0.70  # Port closed
+    packet_size:
+      control_range: [40, 60]
+    timing:
+      interval: "100ms"  # Very fast
+
+  syn_flood:
+    description: "SYN flood attack pattern"
+    characteristics:
+      - "SYN only (no SYN-ACK response)"
+      - "High volume, single target"
+      - "Many spoofed source IPs"
+      - "No data transfer"
+    default_params:
+      n_sessions: 500
+      n_client_hosts: 100  # Spoofed IPs
+      n_server_hosts: 1  # Single target
+    state_machine:
+      syn_only: true
+    packet_size:
+      control_range: [40, 60]
+    timing:
+      interval: "10ms"  # Very high rate
+
+  large_upload:
+    description: "Data exfiltration pattern"
+    characteristics:
+      - "Full handshake"
+      - "Abnormally large C2S data volume (upload)"
+      - "External destination"
+      - "Long session duration"
+    default_params:
+      n_sessions: 20
+      n_client_hosts: 5
+      n_server_hosts: 3
+    state_machine:
+      c2s_probability: 0.60  # Heavy upload
+      s2c_probability: 0.10  # Minimal response
+    packet_size:
+      data_range: [1400, 1500]  # Max size packets
+    timing:
+      time_of_day: "night"  # Off-hours
+
+  beaconing:
+    description: "C2 beaconing pattern"
+    characteristics:
+      - "Regular intervals between sessions"
+      - "Small, fixed-size packets"
+      - "Long overall duration"
+      - "External destination"
+    default_params:
+      n_sessions: 50
+      n_client_hosts: 10
+      n_server_hosts: 2  # C2 servers
+    state_machine:
+      data_packet_probability: 0.75
+      fin_probability: 0.15
+    packet_size:
+      data_range: [50, 150]  # Small, consistent
+    timing:
+      interval: "60s"  # Regular beacon interval
+
+  dns_tunnel:
+    description: "DNS tunneling attempt"
+    characteristics:
+      - "DNS port (53)"
+      - "Unusually large packets for DNS"
+      - "High query frequency"
+      - "External DNS server"
+    default_params:
+      n_sessions: 100
+      n_client_hosts: 5
+      n_server_hosts: 2
+    state_machine:
+      data_packet_probability: 0.75
+    packet_size:
+      data_range: [200, 512]  # Large for DNS
+    timing:
+      interval: "5s"  # Frequent queries
+
+  slow_loris:
+    description: "Slow HTTP attack"
+    characteristics:
+      - "Incomplete HTTP requests"
+      - "Connection held open for long time"
+      - "Very slow data rate"
+      - "Many concurrent connections"
+    default_params:
+      n_sessions: 100
+      n_client_hosts: 20
+      n_server_hosts: 1  # Single target
+    state_machine:
+      c2s_probability: 0.70  # Slow drip
+      rst_probability: 0.05  # Eventually times out
+    packet_size:
+      data_range: [50, 100]  # Tiny packets
+    timing:
+      interval: "30s"  # Very slow rate
+
+# =============================================================================
+# SUSPICIOUS FLOW TEMPLATES
+# =============================================================================
+suspicious:
+  brute_force:
+    description: "Authentication brute force"
+    characteristics:
+      - "Multiple short sessions"
+      - "Same destination, different source ports"
+      - "SSH/RDP targets"
+      - "Quick failures (RST after auth attempt)"
+    default_params:
+      n_sessions: 200
+      n_client_hosts: 3  # Few attackers
+      n_server_hosts: 5  # Few targets
+    state_machine:
+      rst_probability: 0.30  # Most fail
+      fin_probability: 0.10
+    timing:
+      interval: "2s"  # Fast attempts
+      time_of_day: "night"
+
+  lateral_movement:
+    description: "Internal reconnaissance"
+    characteristics:
+      - "Internal-to-internal traffic"
+      - "Unusual port access patterns"
+      - "WMI/SMB/RPC protocols"
+      - "Admin tool usage"
+    default_params:
+      n_sessions: 50
+      n_client_hosts: 5
+      n_server_hosts: 20  # Many internal targets
+    state_machine:
+      data_packet_probability: 0.65
+      rst_probability: 0.05
+    timing:
+      interval: "30s"
+
+  data_staging:
+    description: "Pre-exfiltration staging"
+    characteristics:
+      - "Large internal transfers to single host"
+      - "Multiple sources aggregating to one destination"
+      - "SMB/FTP protocols"
+      - "Off-hours timing"
+    default_params:
+      n_sessions: 30
+      n_client_hosts: 10
+      n_server_hosts: 1  # Staging server
+    state_machine:
+      c2s_probability: 0.55  # Heavy staging
+      s2c_probability: 0.15
+    packet_size:
+      data_range: [1400, 1500]  # Max size
+    timing:
+      time_of_day: "night"
+
+  encrypted_tunnel:
+    description: "TLS on non-standard ports"
+    characteristics:
+      - "TLS handshake patterns"
+      - "Non-standard ports (not 443)"
+      - "External destination"
+      - "Encrypted payload after handshake"
+    default_params:
+      n_sessions: 30
+      n_client_hosts: 5
+      n_server_hosts: 3
+    ports: [8443, 4433, 8080]
+    state_machine:
+      data_packet_probability: 0.75
+    timing:
+      interval: "60s"
+
+  protocol_anomaly:
+    description: "Protocol mismatch"
+    characteristics:
+      - "HTTP-like traffic on non-HTTP ports"
+      - "Protocol indicators don't match port"
+      - "Could indicate tunneling or misconfiguration"
+    default_params:
+      n_sessions: 30
+      n_client_hosts: 5
+      n_server_hosts: 5
+    ports: [8888, 9000, 3128]
+    state_machine:
+      data_packet_probability: 0.70
+    timing:
+      interval: "30s"
+
+# =============================================================================
+# GLOBAL SETTINGS
+# =============================================================================
+global:
+  # Default time range for generation
+  time_range:
+    start: "2025-03-01T00:00:00+00:00"
+    end: "2025-03-01T23:59:59+00:00"
+
+  # Network configuration
+  network:
+    internal_subnets:
+      - "10.0.0.0/8"
+      - "192.168.0.0/16"
+      - "172.16.0.0/12"
+    external_ranges:
+      - "8.0.0.0/8"
+      - "13.0.0.0/8"
+      - "20.0.0.0/8"
+
+  # TCP configuration
+  tcp:
+    ephemeral_port_range: [49152, 65535]
+    well_known_ports:
+      HTTP: 80
+      HTTPS: 443
+      SSH: 22
+      FTP: 21
+      SMTP: 25
+      IMAP: 143
+      MYSQL: 3306
+      POSTGRESQL: 5432
+      SMB: 445
+      DNS: 53
+      RDP: 3389
+
+    window_sizes: [8192, 16384, 32768, 65535]
+    ttl_values:
+      linux: 64
+      windows: 128
+      network: 255
+
+  # Packet size semantics
+  packet_sizes:
+    control:
+      min: 40
+      max: 60
+      description: "TCP header only, no payload"
+    data:
+      min: 64
+      max: 1500
+      description: "MTU-bounded payload"
