@@ -372,7 +372,7 @@ def create_normal_web_browsing_schema(
         ],
     )
 
-    t_start, t_end = time_range if time_range else ("2025-03-01T09:00:00+00:00", "2025-03-01T17:00:00+00:00")
+    t_start, t_end = time_range if time_range else ("2025-03-01T09:00:00+00:00", "2025-03-01T09:30:00+00:00")
 
     return DataSchema(
         entities=[
@@ -382,7 +382,7 @@ def create_normal_web_browsing_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "30s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -466,7 +466,7 @@ def create_normal_api_calls_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "10s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -550,7 +550,7 @@ def create_normal_ssh_session_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "5s"),  # More frequent packets
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -634,7 +634,7 @@ def create_normal_file_transfer_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "20s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -718,7 +718,7 @@ def create_normal_database_query_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "15s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -802,7 +802,7 @@ def create_normal_email_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "30s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -888,7 +888,7 @@ def create_anomaly_port_scan_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "100ms"),  # Very fast
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -954,7 +954,7 @@ def create_anomaly_syn_flood_schema(
         ],
     )
 
-    t_start, t_end = time_range if time_range else ("2025-03-01T03:00:00+00:00", "2025-03-01T03:05:00+00:00")  # 5-minute attack
+    t_start, t_end = time_range if time_range else ("2025-03-01T03:00:00+00:00", "2025-03-01T03:15:00+00:00")  # 15-minute attack
 
     return DataSchema(
         entities=[
@@ -964,7 +964,7 @@ def create_anomaly_syn_flood_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "10ms"),  # Very high rate
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1048,7 +1048,7 @@ def create_anomaly_large_upload_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "5s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1132,7 +1132,7 @@ def create_anomaly_beaconing_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "60s"),  # Regular interval
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1217,7 +1217,7 @@ def create_anomaly_dns_tunnel_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "5s"),  # Frequent queries
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1299,7 +1299,7 @@ def create_anomaly_slow_loris_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "30s"),  # Very slow rate
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1389,7 +1389,7 @@ def create_suspicious_brute_force_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "2s"),  # Fast attempts
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1474,7 +1474,7 @@ def create_suspicious_lateral_movement_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "30s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1558,7 +1558,7 @@ def create_suspicious_data_staging_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "10s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1643,7 +1643,7 @@ def create_suspicious_encrypted_tunnel_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "60s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
@@ -1727,7 +1727,7 @@ def create_suspicious_protocol_anomaly_schema(
             session_entity,
         ],
         entity_relationships=_create_standard_relationships(),
-        global_timestamp=_create_global_timestamp(t_start, t_end, "30s"),
+        global_timestamp=_create_global_timestamp(t_start, t_end, "1min"),
     )
 
 
